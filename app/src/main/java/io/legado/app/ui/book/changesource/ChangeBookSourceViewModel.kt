@@ -80,7 +80,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             searchCallback = null
         }
     }.map {
-        searchBooks.sortedBy { it.originOrder }
+        searchBooks.sortedBy { it.latestChapterTitle }
     }.flowOn(IO)
 
     @Volatile
