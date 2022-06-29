@@ -15,43 +15,34 @@ import java.io.File
 class FileAssociationViewModel(application: Application) : BaseAssociationViewModel(application) {
     val importBookLiveData = MutableLiveData<Uri>()
     val onLineImportLive = MutableLiveData<Uri>()
-    val importBookSourceLive = MutableLiveData<String>()
-    val importRssSourceLive = MutableLiveData<String>()
-    val importReplaceRuleLive = MutableLiveData<String>()
     val openBookLiveData = MutableLiveData<String>()
-    val errorLiveData = MutableLiveData<String>()
+    val notSupportedLiveData = MutableLiveData<Pair<Uri, String>>()
 
     @Suppress("BlockingMethodInNonBlockingContext")
-    fun dispatchIndent(uri: Uri, finally: (title: String, msg: String) -> Unit) {
+    fun dispatchIndent(uri: Uri) {
         execute {
+            lateinit var fileName: String
+            lateinit var content: String
             //如果是普通的url，需要根据返回的内容判断是什么
             if (uri.scheme == "file" || uri.scheme == "content") {
-                val content = if (uri.scheme == "file") {
-                    File(uri.path.toString()).readText()
+                if (uri.scheme == "file") {
+                    val file = File(uri.path.toString())
+                    content = file.readText()
+                    fileName = file.name
                 } else {
-                    DocumentFile.fromSingleUri(context, uri)?.readText(context)
-                } ?: throw NoStackTraceException("文件不存在")
+                    val file = DocumentFile.fromSingleUri(context, uri)
+                    content = file?.readText(context) ?: throw NoStackTraceException("文件不存在")
+                    fileName = file.name ?: ""
+                }
                 when {
-                    content.isJson() -> when {
-                        content.contains("bookSourceUrl") ->
-                            importBookSourceLive.postValue(content)
-                        content.contains("sourceUrl") ->
-                            importRssSourceLive.postValue(content)
-                        content.contains("pattern") ->
-                            importReplaceRuleLive.postValue(content)
-                        content.contains("themeName") ->
-                            importTheme(content, finally)
-                        content.contains("name") && content.contains("rule") ->
-                            importTextTocRule(content, finally)
-                        content.contains("name") && content.contains("url") ->
-                            importHttpTTS(content, finally)
-                        else -> errorLiveData.postValue("格式不对")
+                    content.isJson() -> {
+                        importJson(content)
                     }
-                    (uri.path ?: uri.toString()).matches(bookFileRegex) -> {
+                    fileName.matches(bookFileRegex) -> {
                         importBookLiveData.postValue(uri)
                     }
                     else -> {
-                        throw NoStackTraceException("暂未支持的本地书籍格式(TXT/UMD/EPUB)")
+                        notSupportedLiveData.postValue(Pair(uri, fileName))
                     }
                 }
             } else {
@@ -59,7 +50,7 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
             }
         }.onError {
             it.printOnDebug()
-            errorLiveData.postValue(it.localizedMessage)
+            errorLive.postValue(it.localizedMessage)
         }
     }
 

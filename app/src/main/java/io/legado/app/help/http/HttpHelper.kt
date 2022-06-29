@@ -1,12 +1,12 @@
 package io.legado.app.help.http
 
+import io.legado.app.constant.AppConst
+import io.legado.app.help.CacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.cronet.CronetInterceptor
 import io.legado.app.help.http.cronet.CronetLoader
-import okhttp3.ConnectionSpec
-import okhttp3.Credentials
-import okhttp3.Interceptor
-import okhttp3.OkHttpClient
+import io.legado.app.utils.NetworkUtils
+import okhttp3.*
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.ConcurrentHashMap
@@ -14,6 +14,25 @@ import java.util.concurrent.TimeUnit
 
 private val proxyClientCache: ConcurrentHashMap<String, OkHttpClient> by lazy {
     ConcurrentHashMap()
+}
+
+val cookieJar by lazy {
+    object : CookieJar {
+
+        override fun loadForRequest(url: HttpUrl): List<Cookie> {
+            return emptyList()
+        }
+
+        override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+            cookies.forEach {
+                //CookieStore.replaceCookie(url.toString(), "${it.name}=${it.value}")
+                //临时保存 书源启用cookie选项再添加到数据库
+                val domain = NetworkUtils.getSubDomain(url.toString())
+                CacheManager.putMemory("${domain}_cookieJar", "${it.name}=${it.value}")
+            }
+        }
+
+    }
 }
 
 val okHttpClient: OkHttpClient by lazy {
@@ -27,7 +46,8 @@ val okHttpClient: OkHttpClient by lazy {
         .connectTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(60,TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .cookieJar(cookieJar = cookieJar)
         .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory, SSLHelper.unsafeTrustManager)
         .retryOnConnectionFailure(true)
         .hostnameVerifier(SSLHelper.unsafeHostnameVerifier)
@@ -36,15 +56,17 @@ val okHttpClient: OkHttpClient by lazy {
         .followSslRedirects(true)
         .addInterceptor(Interceptor { chain ->
             val request = chain.request()
-                .newBuilder()
-                .addHeader("Keep-Alive", "300")
-                .addHeader("Connection", "Keep-Alive")
-                .addHeader("Cache-Control", "no-cache")
-                .build()
-            chain.proceed(request)
+            val builder = request.newBuilder()
+            if (request.header(AppConst.UA_NAME) == null) {
+                builder.addHeader(AppConst.UA_NAME, AppConfig.userAgent)
+            }
+            builder.addHeader("Keep-Alive", "300")
+            builder.addHeader("Connection", "Keep-Alive")
+            builder.addHeader("Cache-Control", "no-cache")
+            chain.proceed(builder.build())
         })
     if (!AppConfig.isGooglePlay && AppConfig.isCronet && CronetLoader.install()) {
-        builder.addInterceptor(CronetInterceptor(null))
+        builder.addInterceptor(CronetInterceptor(cookieJar = cookieJar))
     }
     builder.build()
 }

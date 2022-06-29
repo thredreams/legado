@@ -16,6 +16,7 @@ object EventBus {
     const val AUDIO_SUB_TITLE = "audioSubTitle"
     const val AUDIO_STATE = "audioState"
     const val AUDIO_PROGRESS = "audioProgress"
+    const val AUDIO_BUFFER_PROGRESS = "audioBufferProgress"
     const val AUDIO_SIZE = "audioSize"
     const val AUDIO_SPEED = "audioSpeed"
     const val NOTIFY_MAIN = "notifyMain"
@@ -27,4 +28,5 @@ object EventBus {
     const val TIP_COLOR = "tipColor"
     const val SOURCE_CHANGED = "sourceChanged"
     const val SEARCH_RESULT = "searchResult"
+    const val BOOK_URL_CHANGED = "bookUrlChanged"
 }

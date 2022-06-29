@@ -1,6 +1,7 @@
 package io.legado.app.data.entities
 
 import android.os.Parcelable
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -14,20 +15,35 @@ import splitties.init.appCtx
 data class RssSource(
     @PrimaryKey
     var sourceUrl: String = "",
+    // 名称
     var sourceName: String = "",
+    // 图标
     var sourceIcon: String = "",
+    // 分组
     var sourceGroup: String? = null,
+    // 注释
     var sourceComment: String? = null,
+    // 是否启用
     var enabled: Boolean = true,
-    override var concurrentRate: String? = null,    //并发率
-    override var header: String? = null,            // 请求头
-    override var loginUrl: String? = null,          // 登录地址
-    override var loginUi: String? = null,               //登录UI
-    var loginCheckJs: String? = null,               //登录检测js
+    // 自定义变量说明
+    var variableComment: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    override var enabledCookieJar: Boolean? = false,
+    //并发率
+    override var concurrentRate: String? = null,
+    // 请求头
+    override var header: String? = null,
+    // 登录地址
+    override var loginUrl: String? = null,
+    //登录UI
+    override var loginUi: String? = null,
+    //登录检测js
+    var loginCheckJs: String? = null,
     var sortUrl: String? = null,
     var singleUrl: Boolean = false,
     /*列表规则*/
-    var articleStyle: Int = 0,                      //列表样式,0,1,2
+    //列表样式,0,1,2
+    var articleStyle: Int = 0,
     var ruleArticles: String? = null,
     var ruleNextPage: String? = null,
     var ruleTitle: String? = null,
@@ -63,18 +79,28 @@ data class RssSource(
 
     fun equal(source: RssSource): Boolean {
         return equal(sourceUrl, source.sourceUrl)
-            && equal(sourceIcon, source.sourceIcon)
-            && enabled == source.enabled
-            && equal(sourceGroup, source.sourceGroup)
-            && equal(ruleArticles, source.ruleArticles)
-            && equal(ruleNextPage, source.ruleNextPage)
-            && equal(ruleTitle, source.ruleTitle)
-            && equal(rulePubDate, source.rulePubDate)
-            && equal(ruleDescription, source.ruleDescription)
-            && equal(ruleLink, source.ruleLink)
-            && equal(ruleContent, source.ruleContent)
-            && enableJs == source.enableJs
-            && loadWithBaseUrl == source.loadWithBaseUrl
+                && equal(sourceIcon, source.sourceIcon)
+                && enabled == source.enabled
+                && equal(sourceGroup, source.sourceGroup)
+                && enabledCookieJar == source.enabledCookieJar
+                && equal(sourceComment, source.sourceComment)
+                && equal(concurrentRate, source.concurrentRate)
+                && equal(header, source.header)
+                && equal(loginUrl, source.loginUrl)
+                && equal(loginUi, source.loginUi)
+                && equal(loginCheckJs, source.loginCheckJs)
+                && equal(sortUrl, source.sortUrl)
+                && singleUrl == source.singleUrl
+                && articleStyle == source.articleStyle
+                && equal(ruleArticles, source.ruleArticles)
+                && equal(ruleNextPage, source.ruleNextPage)
+                && equal(ruleTitle, source.ruleTitle)
+                && equal(rulePubDate, source.rulePubDate)
+                && equal(ruleDescription, source.ruleDescription)
+                && equal(ruleLink, source.ruleLink)
+                && equal(ruleContent, source.ruleContent)
+                && enableJs == source.enableJs
+                && loadWithBaseUrl == source.loadWithBaseUrl
     }
 
     private fun equal(a: String?, b: String?): Boolean {
@@ -118,6 +144,14 @@ data class RssSource(
         }
     }
 
+    fun getDisplayVariableComment(otherComment: String): String {
+        return if (variableComment.isNullOrBlank()) {
+            otherComment
+        } else {
+            "${variableComment}\n$otherComment"
+        }
+    }
+
     @Suppress("MemberVisibilityCanBePrivate")
     companion object {
 
@@ -150,6 +184,7 @@ data class RssSource(
                     style = doc.readString("$.style"),
                     enableJs = doc.readBool("$.enableJs") ?: true,
                     loadWithBaseUrl = doc.readBool("$.loadWithBaseUrl") ?: true,
+                    enabledCookieJar = doc.readBool("$.enabledCookieJar") ?: false,
                     customOrder = doc.readInt("$.customOrder") ?: 0
                 )
             }

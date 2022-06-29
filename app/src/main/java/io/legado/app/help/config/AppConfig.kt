@@ -11,7 +11,8 @@ import splitties.init.appCtx
 @Suppress("MemberVisibilityCanBePrivate")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isGooglePlay = appCtx.channel == "google"
-    val isCronet = appCtx.getPrefBoolean("Cronet")
+    val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
+    val useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
     var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
@@ -242,6 +243,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefInt(PreferKey.exportType, value)
         }
+    var exportPictureFile: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.exportPictureFile, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.exportPictureFile, value)
+        }
 
     var changeSourceCheckAuthor: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.changeSourceCheckAuthor)
@@ -276,9 +282,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val autoChangeSource: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.autoChangeSource, true)
 
-    val changeSourceLoadInfo get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadInfo)
+    var changeSourceLoadInfo: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadInfo)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.changeSourceLoadInfo, value)
+        }
 
-    val changeSourceLoadToc get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadToc)
+    var changeSourceLoadToc: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadToc)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.changeSourceLoadToc, value)
+        }
 
     val importKeepName get() = appCtx.getPrefBoolean(PreferKey.importKeepName)
 
@@ -296,10 +310,16 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val recordLog get() = appCtx.getPrefBoolean(PreferKey.recordLog)
 
-    val loadOnlyWifi = appCtx.getPrefBoolean(PreferKey.loadCoverOnlyWifi, false)
+    val loadCoverOnlyWifi = appCtx.getPrefBoolean(PreferKey.loadCoverOnlyWifi, false)
 
     val doublePageHorizontal: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.doublePageHorizontal, true)
+
+    var searchGroup: String
+        get() = appCtx.getPrefString("searchGroup") ?: ""
+        set(value) {
+            appCtx.putPrefString("searchGroup", value)
+        }
 
     private fun getPrefUserAgent(): String {
         val ua = appCtx.getPrefString(PreferKey.userAgent)
@@ -308,5 +328,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
         return ua
     }
+
+    var bitmapCacheSize: Int
+        get() = appCtx.getPrefInt(PreferKey.bitmapCacheSize, 50)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.bitmapCacheSize, value)
+        }
 }
 

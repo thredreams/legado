@@ -34,13 +34,9 @@ class BookSourceAdapter(context: Context, val callBack: CallBack) :
 
     val selection: List<BookSource>
         get() {
-            val selection = arrayListOf<BookSource>()
-            getItems().map {
-                if (selected.contains(it)) {
-                    selection.add(it)
-                }
+            return getItems().filter {
+                selected.contains(it)
             }
-            return selection.sortedBy { it.customOrder }
         }
 
     val diffItemCallback: DiffUtil.ItemCallback<BookSource>
@@ -52,10 +48,10 @@ class BookSourceAdapter(context: Context, val callBack: CallBack) :
 
             override fun areContentsTheSame(oldItem: BookSource, newItem: BookSource): Boolean {
                 return oldItem.bookSourceName == newItem.bookSourceName
-                    && oldItem.bookSourceGroup == newItem.bookSourceGroup
-                    && oldItem.enabled == newItem.enabled
-                    && oldItem.enabledExplore == newItem.enabledExplore
-                    && oldItem.exploreUrl == newItem.exploreUrl
+                        && oldItem.bookSourceGroup == newItem.bookSourceGroup
+                        && oldItem.enabled == newItem.enabled
+                        && oldItem.enabledExplore == newItem.enabledExplore
+                        && oldItem.exploreUrl == newItem.exploreUrl
             }
 
             override fun getChangePayload(oldItem: BookSource, newItem: BookSource): Any? {

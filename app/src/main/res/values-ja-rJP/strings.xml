@@ -46,7 +46,7 @@
     <string name="recent_reading">Recent reading</string>
     <string name="last_read">Last reading</string>
     <string name="update_log">What\'s new</string>
-    <string name="bookshelf_empty">The bookshelf is still empty. Search for books or add them from discovery! \n if you use it for the first time, please pay attention to the public account [开源阅读] to get the book source!</string>
+    <string name="bookshelf_empty">The bookshelf is still empty. Search for books or add them from discovery! \n if you use it for the first time, please open legado.top get help!</string>
     <string name="action_search">Search</string>
     <string name="action_download">Download</string>
     <string name="layout_list">List</string>
@@ -271,7 +271,7 @@
     <string name="load_over_time">Loading timeout</string>
     <string name="join_group">Follow:%s</string>
     <string name="copy_complete">Copied successfully</string>
-    <string name="arrange_bookshelf">Bookshelf arrangement</string>
+    <string name="bookshelf_management">Bookshelf management</string>
     <string name="clear_bookshelf_s">It will delete all books. Be careful,please.</string>
     <string name="search_book_source">Search book sources</string>
     <string name="search_rss_source">Search subscription sources</string>
@@ -392,7 +392,7 @@
     <string name="source_group">源分组(sourceGroup)</string>
     <string name="diy_source_group">自定义源分组</string>
     <string name="diy_edit_source_group">输入自定义源分组名称</string>
-    <string name="source_concurrent_rate">并发率(concurrentRate)</string>
+    <string name="concurrent_rate">并发率(concurrentRate)</string>
     <string name="sort_url">分类Url(sortUrl)</string>
     <string name="login_url">登录URL(loginUrl)</string>
     <string name="login_ui">登录UI(loginUi)</string>
@@ -420,6 +420,7 @@
     <string name="rule_is_volume">Volume mark(isVolume)</string>
     <string name="rule_is_vip">VIP标识(isVip)</string>
     <string name="rule_update_time">更新时间(ChapterInfo)</string>
+    <string name="pre_update_js">更新之前Js(preUpdateJs)</string>
     <string name="rule_book_content">正文规则(content)</string>
     <string name="rule_next_content">正文下一页URL规则(nextContentUrl)</string>
     <string name="rule_web_js">WebViewJs(webJs)</string>
@@ -739,7 +740,7 @@
     <string name="alipay_red_envelope_qr_code">AliPay red envelope QR code</string>
     <string name="alipay_payment_qr_code">AliPay QR code</string>
     <string name="qq_collection_qr_code">QQ Collection QR code</string>
-    <string name="contributors_summary">gedoor,Invinciblelee etc. Checking in github for details</string>
+    <string name="contributors_summary">gedoor,Invinciblelee,Xwite etc. Checking in github for details</string>
     <string name="clear_cache_summary">Clear the cache of the downloaded books and fonts</string>
     <string name="default_cover">Default cover</string>
     <string name="restore_ignore">Bypass list</string>
@@ -779,8 +780,8 @@
     <string name="select_theme">Switch default theme</string>
     <string name="sort_by_lastUpdateTime">Sort by update time</string>
     <string name="search_content">Search content</string>
-    <string name="rss_source_empty">Follow Wechat official account [开源阅读] to get Subscription source</string>
-    <string name="explore_empty">Empty now,Follow Wechat official account [开源阅读] to get Discovery source</string>
+    <string name="rss_source_empty">Empty now!</string>
+    <string name="explore_empty">Empty now!</string>
     <string name="page_key_set_help">将焦点放到输入框按下物理按键会自动录入键值,多个按键会自动用英文逗号隔开.</string>
     <string name="theme_name">Theme name</string>
     <string name="auto_clear_expired">"Clear expired search histories automatically "</string>
@@ -869,6 +870,8 @@
     <string name="background_image_hint">Disabled when 0, enable range from 1 to 25\nThe greater the radius, the stronger the effect of blurring</string>
     <string name="need_login">需登录</string>
     <string name="pref_cronet_summary">使用Cronet网络组件</string>
+    <string name="anti_alias">Anti-Aliasing</string>
+    <string name="pref_anti_alias_summary">Anti-Aliasing when draw picture</string>
     <string name="upload_url">上传URL</string>
     <string name="download_url_rule">下载URL规则</string>
     <string name="sort_by_respondTime">Sort by respond time</string>
@@ -910,7 +913,7 @@
     <string name="font_scale">字体大小</string>
     <string name="font_scale_summary">当前字体大小:%.1f</string>
     <string name="search_content_size">search result</string>
-    <string name="search_content_empty">search result is empty</string>
+    <string name="search_content_empty">Empty search result, check conversation settings</string>
     <string name="tts_speech_reduce">语速减</string>
     <string name="tts_speech_add">语速加</string>
     <string name="open_sys_dir_picker_error">打开系统文件夹选择器出错,自动打开应用文件夹选择器</string>
@@ -968,5 +971,33 @@
     <string name="sys_tts_config">系统tts设置</string>
     <string name="sys_tts_config_summary">打开系统tts设置界面</string>
     <string name="cannot_timed_non_playback">非播放状态无法定时</string>
+    <string name="all_bookmark">所有书签</string>
+    <string name="change_source_batch">批量换源</string>
+    <string name="book_type_different">书籍类型不一样</string>
+    <string name="soure_change_source">是否确认换源</string>
+    <string name="input_verification_code">输入验证码</string>
+    <string name="verification_code">验证码</string>
+    <string name="timeout_millisecond">超时毫秒数</string>
+    <string name="file_not_supported">Continue to open although %1$s is not supported ?</string>
+    <string name="import_tts">导入TTS</string>
+    <string name="import_theme">导入主题</string>
+    <string name="import_txt_toc_rule">导入txt目录规则</string>
+    <string name="auto_save_cookie">CookieJar</string>
+    <string name="click_read_button_load">点击阅读加载目录</string>
+    <string name="cookie">清除cookie</string>
+    <string name="download_and_import_file">导入在线书籍文件</string>
+    <string name="upload_book_success">Upload Success</string>
+    <string name="upload_book_fail">Upload Fail</string>
+    <string name="download_book_success">Download Success</string>
+    <string name="download_book_fail">Download Fail</string>
+    <string name="upload_to_remote">Upload</string>
+    <string name="add_remote_book">WebDavBook</string>
+    <string name="bitmap_cache_size_summary">Current cache max size %1$s MB</string>
+    <string name="bitmap_cache_size">bitmap cache size</string>
+    <string name="export_pics_file">Export Picture Files</string>
     <!-- string end -->
+    <string name="error_decode_bitmap">Fail to decode bitmap</string>
+    <string name="error_image_url_empty">Image url is empty, check replacement rules</string>
+    <string name="variable_comment">变量说明(variableComment)</string>
+    <string name="remote_book">远程书籍</string>
 </resources>

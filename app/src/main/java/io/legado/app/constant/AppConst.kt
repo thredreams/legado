@@ -3,12 +3,10 @@ package io.legado.app.constant
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.provider.Settings
+import com.script.javascript.RhinoScriptEngine
 import io.legado.app.BuildConfig
-import io.legado.app.R
 import splitties.init.appCtx
 import java.text.SimpleDateFormat
-import javax.script.ScriptEngine
-import javax.script.ScriptEngineManager
 
 @SuppressLint("SimpleDateFormat")
 object AppConst {
@@ -23,8 +21,8 @@ object AppConst {
 
     const val MAX_THREAD = 9
 
-    val SCRIPT_ENGINE: ScriptEngine by lazy {
-        ScriptEngineManager().getEngineByName("rhino")
+    val SCRIPT_ENGINE: RhinoScriptEngine by lazy {
+        RhinoScriptEngine()
     }
 
     val timeFormat: SimpleDateFormat by lazy {
@@ -39,6 +37,7 @@ object AppConst {
         SimpleDateFormat("yy-MM-dd-HH-mm-ss")
     }
 
+    const val rootGroupId = -100L
     const val bookGroupAllId = -1L
     const val bookGroupLocalId = -2L
     const val bookGroupAudioId = -3L
@@ -57,10 +56,12 @@ object AppConst {
     )
 
     @SuppressLint("PrivateResource")
-    val sysElevation = appCtx.resources.getDimension(R.dimen.design_appbar_elevation).toInt()
+    val sysElevation =
+        appCtx.resources.getDimension(com.google.android.material.R.dimen.design_appbar_elevation)
+            .toInt()
 
     val androidId: String by lazy {
-        Settings.System.getString(appCtx.contentResolver, Settings.Secure.ANDROID_ID)
+        Settings.System.getString(appCtx.contentResolver, Settings.Secure.ANDROID_ID) ?: "null"
     }
 
     val appInfo: AppInfo by lazy {

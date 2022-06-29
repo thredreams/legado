@@ -50,7 +50,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                     )
                     WebBook.getBookInfo(this, bookSource, book)
                         .onSuccess(IO) {
-                            it.order = appDb.bookDao.maxOrder + 1
+                            it.order = appDb.bookDao.minOrder - 1
                             it.save()
                             successCount++
                         }.onError {
@@ -132,7 +132,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                 if (name.isNotEmpty() && appDb.bookDao.getBook(name, author) == null) {
                     WebBook.preciseSearch(this, bookSources, name, author)
                         .onSuccess {
-                            val book = it.second
+                            val book = it.first
                             if (groupId > 0) {
                                 book.group = groupId
                             }

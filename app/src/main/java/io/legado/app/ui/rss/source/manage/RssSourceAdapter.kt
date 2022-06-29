@@ -27,13 +27,9 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
 
     val selection: List<RssSource>
         get() {
-            val selection = arrayListOf<RssSource>()
-            getItems().forEach {
-                if (selected.contains(it)) {
-                    selection.add(it)
-                }
+            return getItems().filter {
+                selected.contains(it)
             }
-            return selection.sortedBy { it.customOrder }
         }
 
     val diffItemCallback = object : DiffUtil.ItemCallback<RssSource>() {
@@ -44,8 +40,8 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
 
         override fun areContentsTheSame(oldItem: RssSource, newItem: RssSource): Boolean {
             return oldItem.sourceName == newItem.sourceName
-                && oldItem.sourceGroup == newItem.sourceGroup
-                && oldItem.enabled == newItem.enabled
+                    && oldItem.sourceGroup == newItem.sourceGroup
+                    && oldItem.enabled == newItem.enabled
         }
 
         override fun getChangePayload(oldItem: RssSource, newItem: RssSource): Any? {

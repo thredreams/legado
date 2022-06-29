@@ -1,19 +1,17 @@
 package io.legado.app.help
 
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
-import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.IO
 import org.apache.commons.text.similarity.JaccardSimilarity
 import splitties.init.appCtx
 import java.io.File
@@ -44,8 +42,8 @@ object BookHelp {
     /**
      * 清除已删除书的缓存
      */
-    fun clearRemovedCache() {
-        Coroutine.async {
+    suspend fun clearInvalidCache() {
+        withContext(IO) {
             val bookFolderNames = appDb.bookDao.all.map {
                 it.getFolderName()
             }
@@ -125,11 +123,11 @@ object BookHelp {
                     cacheFolderName,
                     book.getFolderName(),
                     cacheImageFolderName,
-                    "${MD5Utils.md5Encode16(src)}${getImageSuffix(src)}"
+                    "${MD5Utils.md5Encode16(src)}.${getImageSuffix(src)}"
                 ).writeBytes(it)
             }
         } catch (e: Exception) {
-            e.printOnDebug()
+            AppLog.putDebug("${src}下载错误", e)
         } finally {
             downloadImages.remove(src)
         }
@@ -140,14 +138,16 @@ object BookHelp {
             cacheFolderName,
             book.getFolderName(),
             cacheImageFolderName,
-            "${MD5Utils.md5Encode16(src)}${getImageSuffix(src)}"
+            "${MD5Utils.md5Encode16(src)}.${getImageSuffix(src)}"
         )
     }
 
     fun getImageSuffix(src: String): String {
         var suffix = src.substringAfterLast(".").substringBefore(",")
-        if (suffix.length > 5) {
-            suffix = ".jpg"
+        //检查截取的后缀字符是否合法 [a-zA-Z0-9]
+        val fileSuffixRegex = Regex("^[a-z0-9]+$", RegexOption.IGNORE_CASE)
+        if (suffix.length > 5 || !suffix.matches(fileSuffixRegex)) {
+            suffix = "jpg"
         }
         return suffix
     }
@@ -327,9 +327,9 @@ object BookHelp {
         val chapterName1 = StringUtils.fullToHalf(chapterName).replace(regexA, "")
         return StringUtils.stringToInt(
             (
-                chapterNamePattern1.matcher(chapterName1).takeIf { it.find() }
-                    ?: chapterNamePattern2.matcher(chapterName1).takeIf { it.find() }
-                )?.group(1)
+                    chapterNamePattern1.matcher(chapterName1).takeIf { it.find() }
+                        ?: chapterNamePattern2.matcher(chapterName1).takeIf { it.find() }
+                    )?.group(1)
                 ?: "-1"
         )
     }

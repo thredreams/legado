@@ -4,17 +4,16 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.*
+import io.legado.app.help.AppWebDav
 import io.legado.app.help.BookHelp
 import io.legado.app.help.ContentProcessor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.storage.AppWebDav
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
-import io.legado.app.ui.book.read.page.provider.ImageProvider
 import io.legado.app.utils.msg
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +21,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import splitties.init.appCtx
+import kotlin.math.min
 
 
 @Suppress("MemberVisibilityCanBePrivate")
@@ -55,7 +55,6 @@ object ReadBook : CoroutineScope by MainScope() {
         callBack?.upMenuView()
         callBack?.upPageAnim()
         upWebBook(book)
-        ImageProvider.clearAllCache()
         synchronized(this) {
             loadingChapters.clear()
         }
@@ -91,7 +90,7 @@ object ReadBook : CoroutineScope by MainScope() {
     fun setProgress(progress: BookProgress) {
         if (progress.durChapterIndex < chapterSize &&
             (durChapterIndex != progress.durChapterIndex
-                || durChapterPos != progress.durChapterPos)
+                    || durChapterPos != progress.durChapterPos)
         ) {
             durChapterIndex = progress.durChapterIndex
             durChapterPos = progress.durChapterPos
@@ -207,7 +206,6 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         upReadTime()
         preDownload()
-        ImageProvider.clearOut(durChapterIndex)
     }
 
     /**
@@ -440,7 +438,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 delay(1000)
                 download(i)
             }
-            val minChapterIndex = durChapterIndex - 5
+            val minChapterIndex = durChapterIndex - min(5, AppConfig.preDownloadNum)
             for (i in durChapterIndex.minus(2) downTo minChapterIndex) {
                 delay(1000)
                 download(i)

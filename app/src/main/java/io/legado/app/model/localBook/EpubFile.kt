@@ -2,6 +2,7 @@ package io.legado.app.model.localBook
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.text.TextUtils
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -20,10 +21,11 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.Charset
+import java.util.zip.ZipFile
 
 class EpubFile(var book: Book) {
 
-    companion object {
+    companion object : BaseLocalBookParse {
         private var eFile: EpubFile? = null
 
         @Synchronized
@@ -31,7 +33,7 @@ class EpubFile(var book: Book) {
             if (eFile == null || eFile?.book?.bookUrl != book.bookUrl) {
                 eFile = EpubFile(book)
                 //对于Epub文件默认不启用替换
-                book.setUseReplaceRule(false)
+                //io.legado.app.data.entities.Book getUseReplaceRule
                 return eFile!!
             }
             eFile?.book = book
@@ -39,17 +41,17 @@ class EpubFile(var book: Book) {
         }
 
         @Synchronized
-        fun getChapterList(book: Book): ArrayList<BookChapter> {
+        override fun getChapterList(book: Book): ArrayList<BookChapter> {
             return getEFile(book).getChapterList()
         }
 
         @Synchronized
-        fun getContent(book: Book, chapter: BookChapter): String? {
+        override fun getContent(book: Book, chapter: BookChapter): String? {
             return getEFile(book).getContent(chapter)
         }
 
         @Synchronized
-        fun getImage(
+        override fun getImage(
             book: Book,
             href: String
         ): InputStream? {
@@ -57,7 +59,7 @@ class EpubFile(var book: Book) {
         }
 
         @Synchronized
-        fun upBookInfo(book: Book) {
+        override fun upBookInfo(book: Book) {
             return getEFile(book).upBookInfo()
         }
     }
@@ -101,9 +103,17 @@ class EpubFile(var book: Book) {
     /*重写epub文件解析代码，直接读出压缩包文件生成Resources给epublib，这样的好处是可以逐一修改某些文件的格式错误*/
     private fun readEpub(): EpubBook? {
         try {
-            val bis = LocalBook.getBookInputStream(book)
-            //通过懒加载读取epub
-            return EpubReader().readEpub(bis, "utf-8")
+            val uri = Uri.parse(book.bookUrl)
+            return if (uri.isContentScheme()) {
+                //高版本的手机内存一般足够大，直接加载到内存中最快
+                EpubReader().readEpub(LocalBook.getBookInputStream(book), "utf-8")
+            } else {
+                //低版本的使用懒加载
+                EpubReader().readEpubLazy(ZipFile(uri.path), "utf-8")
+
+            }
+
+
         } catch (e: Exception) {
             e.printOnDebug()
         }
@@ -111,6 +121,13 @@ class EpubFile(var book: Book) {
     }
 
     private fun getContent(chapter: BookChapter): String? {
+         /**
+          * <image width="1038" height="670" xlink:href="..."/>
+          * ...titlepage.xhtml
+          */
+        if (chapter.url.contains("titlepage.xhtml")) {
+            return "<img src=\"cover.jpeg\" />"
+        }
         /*获取当前章节文本*/
         epubBook?.let { epubBook ->
             val nextUrl = chapter.getVariable("nextUrl")
@@ -124,8 +141,15 @@ class EpubFile(var book: Book) {
                 if (chapter.url.substringBeforeLast("#") == res.href) {
                     elements.add(getBody(res, startFragmentId, endFragmentId))
                     isChapter = true
+                   /**
+                    * fix https://github.com/gedoor/legado/issues/1927 加载全部内容的bug
+                    * content src text/000001.html（当前章节）
+-                   * content src text/000001.html#toc_id_x (下一章节）
+                     */
+                    if (res.href == nextUrl?.substringBeforeLast("#")) break
                 } else if (isChapter) {
-                    if (nextUrl.isNullOrBlank() || res.href == nextUrl.substringBeforeLast("#")) {
+                    // fix 最后一章存在多个html时 内容缺失
+                    if (res.href == nextUrl?.substringBeforeLast("#")) {
                         break
                     }
                     elements.add(getBody(res, startFragmentId, endFragmentId))
@@ -147,7 +171,10 @@ class EpubFile(var book: Book) {
             body.getElementById(startFragmentId)?.previousElementSiblings()?.remove()
         }
         if (!endFragmentId.isNullOrBlank() && endFragmentId != startFragmentId) {
-            body.getElementById(endFragmentId)?.nextElementSiblings()?.remove()
+            body.getElementById(endFragmentId)?.run {
+                nextElementSiblings()?.remove()
+                remove()
+            }
         }
         /*选择去除正文中的H标签，部分书籍标题与阅读标题重复待优化*/
         val tag = Book.hTag
@@ -168,6 +195,7 @@ class EpubFile(var book: Book) {
     }
 
     private fun getImage(href: String): InputStream? {
+        if (href == "cover.jpeg") return epubBook?.coverImage?.inputStream
         val abHref = href.replace("../", "")
         return epubBook?.resources?.getByHref(abHref)?.inputStream
     }
@@ -256,8 +284,12 @@ class EpubFile(var book: Book) {
         while (i < contents.size) {
             val content = contents[i]
             if (!content.mediaType.toString().contains("htm")) continue
-            /*检索到第一章href停止*/
-            if (refs[0].completeHref == content.href) break
+            /**
+             * 检索到第一章href停止
+             * completeHref可能有fragment(#id) 必须去除
+             * fix https://github.com/gedoor/legado/issues/1932
+             */
+            if (refs[0].completeHref.substringBeforeLast("#") == content.href) break
             val chapter = BookChapter()
             var title = content.title
             if (TextUtils.isEmpty(title)) {
@@ -303,6 +335,7 @@ class EpubFile(var book: Book) {
                 durIndex++
             }
             if (ref.children != null && ref.children.isNotEmpty()) {
+                chapterList.lastOrNull()?.isVolume = true
                 parseMenu(chapterList, ref.children, level + 1)
             }
         }

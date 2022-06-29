@@ -10,7 +10,11 @@
 @Json: json规则,直接写时以$.开头可省略@Json
 : regex规则,不可省略,只可以用在书籍列表和目录列表
 ```
+* 书源类型: 文件
+> 对于类似知轩藏书提供文件整合下载的网站，可以'在书源详情的下载URL规则获取文件链接，支持多个链接，阅读会自动下载并导入
 
+* CookieJar
+> 启用后会自动保存每次返回头中的Set-Cookie中的值，适用于验证码图片一类需要session的网站
 * 登录UI
 > 不使用内置webView登录网站，需要使用`登录URL`规则实现登录逻辑，可使用`登录检查JS`检查登录结果
 ```
@@ -38,7 +42,20 @@ source.getLoginInfoMap().get("telephone")
     "telephone":"123456",
     "password":"123456"
 }
-
+source登录相关方法,可在js内通过source.调用,可以参考阿里云语音登录
+login()
+getHeaderMap(hasLoginHeader: Boolean = false)
+getLoginHeader(): String?
+getLoginHeaderMap(): Map<String, String>?
+putLoginHeader(header: String)
+removeLoginHeader()
+setVariable(variable: String?)
+getVariable(): String?
+AnalyzeUrl相关函数,js中通过java.调用
+initUrl() //重新解析url,可以用于登录检测js登录后重新解析url重新访问
+getHeaderMap().putAll(source.getHeaderMap(true)) //重新设置登录头
+getStrResponse( jsStr: String? = null, sourceRegex: String? = null) //返回访问结果,文本类型,书源内部重新登录后可调用此方法重新返回结果
+getResponse(): Response //返回访问结果,网络朗读引擎采用的是这个,调用登录后在调用这方法可以重新访问,参考阿里云登录检测
 ```
 
 * 发现url格式

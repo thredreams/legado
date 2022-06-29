@@ -1,6 +1,7 @@
 package io.legado.app.data.entities
 
 import android.util.Base64
+import com.script.SimpleBindings
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.rule.RowUi
@@ -9,7 +10,6 @@ import io.legado.app.help.JsExtensions
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieStore
 import io.legado.app.utils.*
-import javax.script.SimpleBindings
 
 /**
  * 可在js里调用,source.xxx()
@@ -21,6 +21,7 @@ interface BaseSource : JsExtensions {
     var loginUrl: String?       // 登录地址
     var loginUi: String?   // 登录UI
     var header: String?         // 请求头
+    var enabledCookieJar: Boolean?    //启用cookieJar
 
     fun getTag(): String
 
@@ -58,7 +59,6 @@ interface BaseSource : JsExtensions {
      * 解析header规则
      */
     fun getHeaderMap(hasLoginHeader: Boolean = false) = HashMap<String, String>().apply {
-        this[AppConst.UA_NAME] = AppConfig.userAgent
         header?.let {
             GSON.fromJsonObject<Map<String, String>>(
                 when {
@@ -71,6 +71,9 @@ interface BaseSource : JsExtensions {
             ).getOrNull()?.let { map ->
                 putAll(map)
             }
+        }
+        if (!has(AppConst.UA_NAME, true)) {
+            put(AppConst.UA_NAME, AppConfig.userAgent)
         }
         if (hasLoginHeader) {
             getLoginHeaderMap()?.let {
@@ -95,11 +98,17 @@ interface BaseSource : JsExtensions {
      * 保存登录头部信息,map格式,访问时自动添加
      */
     fun putLoginHeader(header: String) {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
+        val cookie = headerMap?.get("Cookie") ?: headerMap?.get("cookie")
+        cookie?.let {
+            CookieStore.replaceCookie(getKey(), it)
+        }
         CacheManager.put("loginHeader_${getKey()}", header)
     }
 
     fun removeLoginHeader() {
         CacheManager.delete("loginHeader_${getKey()}")
+        CookieStore.removeCookie(getKey())
     }
 
     /**
@@ -108,7 +117,7 @@ interface BaseSource : JsExtensions {
      */
     fun getLoginInfo(): String? {
         try {
-            val key = AppConst.androidId.encodeToByteArray(0, 8)
+            val key = AppConst.androidId.encodeToByteArray(0, 16)
             val cache = CacheManager.get("userInfo_${getKey()}") ?: return null
             val encodeBytes = Base64.decode(cache, Base64.DEFAULT)
             val decodeBytes = EncoderUtils.decryptAES(encodeBytes, key)
@@ -129,7 +138,7 @@ interface BaseSource : JsExtensions {
      */
     fun putLoginInfo(info: String): Boolean {
         return try {
-            val key = (AppConst.androidId).encodeToByteArray(0, 8)
+            val key = (AppConst.androidId).encodeToByteArray(0, 16)
             val encodeBytes = EncoderUtils.encryptAES(info.toByteArray(), key)
             val encodeStr = Base64.encodeToString(encodeBytes, Base64.DEFAULT)
             CacheManager.put("userInfo_${getKey()}", encodeStr)

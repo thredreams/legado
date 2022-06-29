@@ -6,9 +6,13 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.exception.RegexTimeoutException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.utils.msg
+import io.legado.app.utils.replace
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.CancellationException
 import splitties.init.appCtx
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
@@ -67,7 +71,7 @@ class ContentProcessor private constructor(
         return contentReplaceRules
     }
 
-    fun getContent(
+    suspend fun getContent(
         book: Book,
         chapter: BookChapter,
         content: String,
@@ -81,7 +85,7 @@ class ContentProcessor private constructor(
         try {
             val name = Pattern.quote(book.name)
             val title = Pattern.quote(chapter.title)
-            val titleRegex = "^(\\s|\\p{P}|${name})*${title}(\\s)+".toRegex()
+            val titleRegex = "^(\\s|\\p{P}|${name})*${title}(\\s)*".toRegex()
             mContent = mContent.replace(titleRegex, "")
         } catch (e: Exception) {
             AppLog.put("去除重复标题出错\n${e.localizedMessage}", e)
@@ -128,19 +132,29 @@ class ContentProcessor private constructor(
         return contents
     }
 
-    fun replaceContent(content: String): String {
+    suspend fun replaceContent(content: String): String {
         var mContent = content
         getContentReplaceRules().forEach { item ->
             if (item.pattern.isNotEmpty()) {
                 try {
                     mContent = if (item.isRegex) {
-                        mContent.replace(item.pattern.toRegex(), item.replacement)
+                        mContent.replace(
+                            item.pattern.toRegex(),
+                            item.replacement,
+                            item.getValidTimeoutMillisecond()
+                        )
                     } else {
                         mContent.replace(item.pattern, item.replacement)
                     }
+                } catch (e: RegexTimeoutException) {
+                    item.isEnabled = false
+                    appDb.replaceRuleDao.update(item)
+                    return item.name + e.msg
+                } catch (e: CancellationException) {
+                    return mContent
                 } catch (e: Exception) {
-                    AppLog.put("${item.name}替换出错\n${e.localizedMessage}")
-                    appCtx.toastOnUi("${item.name}替换出错")
+                    AppLog.put("替换净化: 规则 ${item.name}替换出错\n替换内容\n${mContent}", e)
+                    appCtx.toastOnUi("替换净化: 规则 ${item.name}替换出错")
                 }
             }
         }

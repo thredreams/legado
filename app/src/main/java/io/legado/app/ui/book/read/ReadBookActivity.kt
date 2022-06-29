@@ -14,6 +14,7 @@ import androidx.core.view.size
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 import io.legado.app.BuildConfig
 import io.legado.app.R
+import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Status
@@ -23,13 +24,14 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.AppWebDav
 import io.legado.app.help.BookHelp
 import io.legado.app.help.IntentData
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.storage.AppWebDav
 import io.legado.app.help.storage.Backup
+import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
@@ -38,6 +40,8 @@ import io.legado.app.model.ReadBook
 import io.legado.app.receiver.TimeBatteryReceiver
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.book.audio.AudioPlayActivity
+import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
 import io.legado.app.ui.book.read.config.*
@@ -51,20 +55,18 @@ import io.legado.app.ui.book.read.page.provider.TextPageFactory
 import io.legado.app.ui.book.searchContent.SearchContentActivity
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
-import io.legado.app.ui.book.toc.BookmarkDialog
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.dict.DictDialog
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
+import io.legado.app.ui.widget.PopupAction
+import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 class ReadBookActivity : BaseReadBookActivity(),
     View.OnTouchListener,
@@ -125,15 +127,17 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var menu: Menu? = null
     private var changeSourceMenu: PopupMenu? = null
     private var refreshMenu: PopupMenu? = null
+    private var autoPageJob: Job? = null
+    private var backupJob: Job? = null
+    private var keepScreenJon: Job? = null
     val textActionMenu: TextActionMenu by lazy {
         TextActionMenu(this, this)
     }
-
+    private val popupAction: PopupAction by lazy {
+        PopupAction(this)
+    }
     override val isInitFinish: Boolean get() = viewModel.isInitFinish
     override val isScroll: Boolean get() = binding.readView.isScroll
-    private var keepScreenJon: Job? = null
-    private var autoPageJob: Job? = null
-    private var backupJob: Job? = null
     override var autoPageProgress = 0
     override var isAutoPage = false
     override var isShowingSearchResult = false
@@ -141,8 +145,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         set(value) {
             field = value && isShowingSearchResult
         }
+    private val timeBatteryReceiver = TimeBatteryReceiver()
     private var screenTimeOut: Long = 0
-    private var timeBatteryReceiver: TimeBatteryReceiver? = null
     private var loadStates: Boolean = false
     override val pageFactory: TextPageFactory get() = binding.readView.pageFactory
     override val headerHeight: Int get() = binding.readView.curPage.headerHeight
@@ -178,7 +182,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onResume()
         ReadBook.readStartTime = System.currentTimeMillis()
         upSystemUiVisibility()
-        timeBatteryReceiver = TimeBatteryReceiver.register(this)
+        registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
     }
 
@@ -187,10 +191,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         autoPageStop()
         backupJob?.cancel()
         ReadBook.saveRead()
-        timeBatteryReceiver?.let {
-            unregisterReceiver(it)
-            timeBatteryReceiver = null
-        }
+        unregisterReceiver(timeBatteryReceiver)
         upSystemUiVisibility()
         if (!BuildConfig.DEBUG) {
             ReadBook.uploadProgress()
@@ -248,7 +249,11 @@ class ReadBookActivity : BaseReadBookActivity(),
                     }
                 }
             }
-            menu.findItem(R.id.menu_get_progress)?.isVisible = AppWebDav.isOk
+            launch {
+                menu.findItem(R.id.menu_get_progress)?.isVisible = withContext(IO) {
+                    AppWebDav.isOk
+                }
+            }
         }
     }
 
@@ -715,8 +720,20 @@ class ReadBookActivity : BaseReadBookActivity(),
     override val oldBook: Book?
         get() = ReadBook.book
 
-    override fun changeTo(source: BookSource, book: Book) {
-        viewModel.changeTo(source, book)
+    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+        if (book.type != BookType.audio) {
+            viewModel.changeTo(source, book, toc)
+        } else {
+            ReadAloud.stop(this)
+            launch {
+                ReadBook.book?.changeTo(book, toc)
+                appDb.bookDao.insert(book)
+            }
+            startActivity<AudioPlayActivity> {
+                putExtra("bookUrl", book.bookUrl)
+            }
+            finish()
+        }
     }
 
     override fun replaceContent(content: String) {
@@ -900,21 +917,15 @@ class ReadBookActivity : BaseReadBookActivity(),
             if (payAction.isNullOrEmpty()) {
                 throw NoStackTraceException("no pay action")
             }
-            if (payAction.isAbsUrl()) {
-                payAction
-            } else {
-                source.evalJS(payAction) {
-                    put("book", book)
-                    put("chapter", chapter)
-                }?.toString()
+            JsUtils.evalJs(payAction) {
+                it["book"] = book
+                it["chapter"] = chapter
             }
         }.onSuccess {
-            it?.let {
-                startActivity<WebViewActivity> {
-                    putExtra("title", getString(R.string.chapter_pay))
-                    putExtra("url", it)
-                    IntentData.put(it, ReadBook.bookSource?.getHeaderMap(true))
-                }
+            startActivity<WebViewActivity> {
+                putExtra("title", getString(R.string.chapter_pay))
+                putExtra("url", it)
+                IntentData.put(it, ReadBook.bookSource?.getHeaderMap(true))
             }
         }.onError {
             toastOnUi(it.localizedMessage)
@@ -937,6 +948,33 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
+     * 长按图片
+     */
+    @SuppressLint("RtlHardcoded")
+    override fun onImageLongPress(x: Float, y: Float, src: String) {
+        popupAction.setItems(
+            listOf(
+                SelectItem(getString(R.string.show), "show"),
+                SelectItem(getString(R.string.refresh), "refresh")
+            )
+        )
+        popupAction.onActionClick = {
+            when (it) {
+                "show" -> showDialogFragment(PhotoDialog(src))
+                "refresh" -> viewModel.refreshImage(src)
+            }
+            popupAction.dismiss()
+        }
+        val navigationBarHeight =
+            if (!ReadBookConfig.hideNavigationBar && navigationBarGravity == Gravity.BOTTOM)
+                navigationBarHeight else 0
+        popupAction.showAtLocation(
+            binding.readView, Gravity.BOTTOM or Gravity.LEFT, x.toInt(),
+            binding.root.height + navigationBarHeight - y.toInt()
+        )
+    }
+
+    /**
      * colorSelectDialog
      */
     override fun onColorSelected(dialogId: Int, color: Int) = ReadBookConfig.durConfig.run {
@@ -947,7 +985,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
             BG_COLOR -> {
                 setCurBg(0, "#${color.hexString}")
-                ReadBookConfig.upBg()
                 postEvent(EventBus.UP_CONFIG, false)
             }
             TIP_COLOR -> {
@@ -1026,10 +1063,12 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun startBackupJob() {
         backupJob?.cancel()
         backupJob = launch {
-            delay(120000)
-            ReadBook.book?.let {
-                AppWebDav.uploadBookProgress(it)
-                Backup.autoBack(this@ReadBookActivity)
+            delay(300000)
+            withContext(IO) {
+                ReadBook.book?.let {
+                    AppWebDav.uploadBookProgress(it)
+                    Backup.autoBack(this@ReadBookActivity)
+                }
             }
         }
     }
@@ -1054,6 +1093,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onDestroy() {
         super.onDestroy()
         textActionMenu.dismiss()
+        popupAction.dismiss()
         binding.readView.onDestroy()
         ReadBook.msg = null
         ReadBook.callBack = null

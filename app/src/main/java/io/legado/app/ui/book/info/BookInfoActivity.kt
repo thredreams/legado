@@ -2,6 +2,7 @@ package io.legado.app.ui.book.info
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -12,6 +13,7 @@ import androidx.activity.viewModels
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -25,17 +27,20 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.BookCover
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.association.ImportOnLineBookFileDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
-import io.legado.app.ui.book.read.PhotoDialog
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.remote.manager.RemoteBookWebDav
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.widget.dialog.PhotoDialog
+import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.*
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
@@ -54,7 +59,6 @@ class BookInfoActivity :
             viewModel.bookData.value?.let { book ->
                 launch {
                     withContext(IO) {
-                        viewModel.durChapterIndex = it.first
                         book.durChapterIndex = it.first
                         book.durChapterPos = it.second
                         appDb.bookDao.update(book)
@@ -128,6 +132,8 @@ class BookInfoActivity :
             viewModel.bookSource != null
         menu.findItem(R.id.menu_split_long_chapter)?.isVisible =
             viewModel.bookData.value?.isLocalTxt() ?: false
+        menu.findItem(R.id.menu_upload)?.isVisible =
+            viewModel.bookData.value?.isLocalBook() ?: false
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -197,6 +203,26 @@ class BookInfoActivity :
                 item.isChecked = !item.isChecked
                 if (!item.isChecked) longToastOnUi(R.string.need_more_time_load_content)
             }
+
+            R.id.menu_upload -> {
+                launch {
+                    val uri = Uri.parse(viewModel.bookData.value?.bookUrl.toString())
+                    val waitDialog = WaitDialog(this@BookInfoActivity)
+                    waitDialog.setText("上传中.....")
+                    waitDialog.show()
+                    try {
+                        val isUpload = RemoteBookWebDav.upload(uri)
+                        if (isUpload)
+                            toastOnUi(getString(R.string.upload_book_success))
+                        else
+                            toastOnUi(getString(R.string.upload_book_fail))
+                    }catch (e : Exception){
+                        toastOnUi(e.localizedMessage)
+                    }finally {
+                        waitDialog.dismiss()
+                    }
+                }
+            }
         }
         return super.onCompatOptionsItemSelected(item)
     }
@@ -220,7 +246,7 @@ class BookInfoActivity :
     }
 
     private fun showCover(book: Book) {
-        binding.ivCover.load(book.getDisplayCover(), book.name, book.author)
+        binding.ivCover.load(book.getDisplayCover(), book.name, book.author, false, book.origin)
         BookCover.loadBlur(this, book.getDisplayCover())
             .into(binding.bgBook)
     }
@@ -231,7 +257,11 @@ class BookInfoActivity :
                 binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
             }
             chapterList.isNullOrEmpty() -> {
-                binding.tvToc.text = getString(R.string.toc_s, getString(R.string.error_load_toc))
+                binding.tvToc.text =
+                    if (viewModel.isImportBookOnLine) getString(R.string.click_read_button_load) else getString(
+                        R.string.toc_s,
+                        getString(R.string.error_load_toc)
+                    )
             }
             else -> {
                 viewModel.bookData.value?.let {
@@ -270,7 +300,7 @@ class BookInfoActivity :
                 showDialogFragment(
                     ChangeCoverDialog(it.name, it.author)
                 )
-            }
+            } ?: toastOnUi("Book is null")
         }
         ivCover.setOnLongClickListener {
             viewModel.bookData.value?.getDisplayCover()?.let { path ->
@@ -279,9 +309,15 @@ class BookInfoActivity :
             true
         }
         tvRead.setOnClickListener {
-            viewModel.bookData.value?.let {
-                readBook(it)
-            }
+            viewModel.bookData.value?.let { book ->
+                if (viewModel.isImportBookOnLine) {
+                    showDialogFragment<ImportOnLineBookFileDialog> {
+                        putString("bookUrl", book.bookUrl)
+                    }
+                } else {
+                    readBook(book)
+                }
+            } ?: toastOnUi("Book is null")
         }
         tvShelf.setOnClickListener {
             if (viewModel.inBookshelf) {
@@ -297,12 +333,12 @@ class BookInfoActivity :
                 startActivity<BookSourceEditActivity> {
                     putExtra("sourceUrl", it.origin)
                 }
-            }
+            } ?: toastOnUi("Book is null")
         }
         tvChangeSource.setOnClickListener {
-            viewModel.bookData.value?.let {
-                showDialogFragment(ChangeBookSourceDialog(it.name, it.author))
-            }
+            viewModel.bookData.value?.let { book ->
+                showDialogFragment(ChangeBookSourceDialog(book.name, book.author))
+            } ?: toastOnUi("Book is null")
         }
         tvTocView.setOnClickListener {
             if (!viewModel.inBookshelf) {
@@ -320,7 +356,7 @@ class BookInfoActivity :
                 showDialogFragment(
                     GroupSelectDialog(it.group)
                 )
-            }
+            } ?: toastOnUi("Book is null")
         }
         tvAuthor.setOnClickListener {
             startActivity<SearchActivity> {
@@ -336,9 +372,14 @@ class BookInfoActivity :
 
     private fun setSourceVariable() {
         launch {
-            val variable = withContext(IO) { viewModel.bookSource?.getVariable() }
+            val source = viewModel.bookSource
+            if (source == null) {
+                toastOnUi("书源不存在")
+                return@launch
+            }
+            val variable = withContext(IO) { source.getVariable() }
             alert(R.string.set_source_variable) {
-                setMessage("源变量可在js中通过source.getVariable()获取")
+                setMessage(source.getDisplayVariableComment("源变量可在js中通过source.getVariable()获取"))
                 val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
                     editView.hint = "source variable"
                     editView.setText(variable)
@@ -357,9 +398,14 @@ class BookInfoActivity :
 
     private fun setBookVariable() {
         launch {
+            val source = viewModel.bookSource
+            if (source == null) {
+                toastOnUi("书源不存在")
+                return@launch
+            }
             val variable = withContext(IO) { viewModel.bookData.value?.getVariable("custom") }
             alert(R.string.set_source_variable) {
-                setMessage("""书籍变量可在js中通过book.getVariable("custom")获取""")
+                setMessage(source.getDisplayVariableComment("""书籍变量可在js中通过book.getVariable("custom")获取"""))
                 val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
                     editView.hint = "book variable"
                     editView.setText(variable)
@@ -457,9 +503,8 @@ class BookInfoActivity :
     override val oldBook: Book?
         get() = viewModel.bookData.value
 
-    override fun changeTo(source: BookSource, book: Book) {
-        upLoading(true)
-        viewModel.changeTo(source, book)
+    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+        viewModel.changeTo(source, book, toc)
     }
 
     override fun coverChangeTo(coverUrl: String) {
@@ -484,4 +529,9 @@ class BookInfoActivity :
         }
     }
 
+    override fun observeLiveBus() {
+        observeEvent<String>(EventBus.BOOK_URL_CHANGED) {
+            viewModel.changeToLocalBook(it)
+        }
+    }
 }

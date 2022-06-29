@@ -11,8 +11,8 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.*
-import io.legado.app.help.DefaultData
 import io.legado.app.help.LauncherIconHelp
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.utils.*
@@ -23,43 +23,40 @@ import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 
 
 object Restore {
 
     suspend fun restore(context: Context, path: String) {
-        withContext(IO) {
+        kotlin.runCatching {
             if (path.isContentScheme()) {
                 DocumentFile.fromTreeUri(context, Uri.parse(path))?.listFiles()?.forEach { doc ->
-                    for (fileName in Backup.backupFileNames) {
-                        if (doc.name == fileName) {
-                            DocumentUtils.readText(context, doc.uri).let {
-                                FileUtils.createFileIfNotExist("${Backup.backupPath}${File.separator}$fileName")
-                                    .writeText(it)
+                    if (Backup.backupFileNames.contains(doc.name)) {
+                        context.contentResolver.openInputStream(doc.uri)?.use { inputStream ->
+                            val file = File("${Backup.backupPath}${File.separator}${doc.name}")
+                            FileOutputStream(file).use { outputStream ->
+                                inputStream.copyTo(outputStream)
                             }
                         }
                     }
                 }
             } else {
-                try {
-                    val file = File(path)
-                    for (fileName in Backup.backupFileNames) {
-                        file.getFile(fileName).let {
-                            if (it.exists()) {
-                                it.copyTo(
-                                    FileUtils.createFileIfNotExist("${Backup.backupPath}${File.separator}$fileName"),
-                                    true
-                                )
-                            }
-                        }
+                val dir = File(path)
+                for (fileName in Backup.backupFileNames) {
+                    val file = dir.getFile(fileName)
+                    if (file.exists()) {
+                        val target = File("${Backup.backupPath}${File.separator}$fileName")
+                        file.copyTo(target, true)
                     }
-                } catch (e: Exception) {
-                    e.printOnDebug()
                 }
             }
+        }.onFailure {
+            AppLog.put("恢复复制文件出错\n${it.localizedMessage}", it)
         }
         restoreDatabase()
         restoreConfig()
+        LocalConfig.lastBackup = System.currentTimeMillis()
     }
 
     suspend fun restoreDatabase(path: String = Backup.backupPath) {
@@ -96,10 +93,10 @@ object Restore {
             fileToListT<RuleSub>(path, "sourceSub.json")?.let {
                 appDb.ruleSubDao.insert(*it.toTypedArray())
             }
-            fileToListT<TxtTocRule>(path, DefaultData.txtTocRuleFileName)?.let {
+            fileToListT<TxtTocRule>(path, "txtTocRule.json")?.let {
                 appDb.txtTocRuleDao.insert(*it.toTypedArray())
             }
-            fileToListT<HttpTTS>(path, DefaultData.httpTtsFileName)?.let {
+            fileToListT<HttpTTS>(path, "httpTTS.json")?.let {
                 appDb.httpTTSDao.insert(*it.toTypedArray())
             }
             fileToListT<ReadRecord>(path, "readRecord.json")?.let {
@@ -130,7 +127,7 @@ object Restore {
                     ThemeConfig.upConfig()
                 }
             } catch (e: Exception) {
-                e.printOnDebug()
+                AppLog.put("恢复主题出错\n${e.localizedMessage}", e)
             }
             if (!BackupConfig.ignoreReadConfig) {
                 //恢复阅读界面配置
@@ -143,7 +140,7 @@ object Restore {
                         ReadBookConfig.initConfigs()
                     }
                 } catch (e: Exception) {
-                    e.printOnDebug()
+                    AppLog.put("恢复阅读界面出错\n${e.localizedMessage}", e)
                 }
                 try {
                     val file =
@@ -154,7 +151,7 @@ object Restore {
                         ReadBookConfig.initShareConfig()
                     }
                 } catch (e: Exception) {
-                    e.printOnDebug()
+                    AppLog.put("恢复阅读界面出错\n${e.localizedMessage}", e)
                 }
             }
             Preferences.getSharedPreferences(appCtx, path, "config")?.all?.let { map ->

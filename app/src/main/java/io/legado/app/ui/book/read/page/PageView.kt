@@ -2,7 +2,6 @@ package io.legado.app.ui.book.read.page
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import androidx.core.view.isGone
@@ -57,6 +56,11 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.upView = {
             setProgress(it)
         }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        upBg()
     }
 
     fun upStyle() = binding.run {
@@ -197,9 +201,9 @@ class PageView(context: Context) : FrameLayout(context) {
         }
     }
 
-    fun setBg(bg: Drawable?) {
+    fun upBg() {
         binding.vwRoot.backgroundColor = ReadBookConfig.bgMeanColor
-        binding.vwBg.background = bg
+        binding.vwBg.background = ReadBookConfig.bg
         upBgAlpha()
     }
 
@@ -260,9 +264,16 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.selectAble = selectAble
     }
 
+    fun longPress(
+        x: Float, y: Float,
+        select: (relativePagePos: Int, lineIndex: Int, charIndex: Int) -> Unit,
+    ) {
+        return binding.contentTextView.longPress(x, y - headerHeight, select)
+    }
+
     fun selectText(
         x: Float, y: Float,
-        select: (relativePage: Int, lineIndex: Int, charIndex: Int) -> Unit,
+        select: (relativePagePos: Int, lineIndex: Int, charIndex: Int) -> Unit,
     ) {
         return binding.contentTextView.selectText(x, y - headerHeight, select)
     }
@@ -271,16 +282,16 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.selectStartMove(x, y - headerHeight)
     }
 
-    fun selectStartMoveIndex(relativePage: Int, lineIndex: Int, charIndex: Int) {
-        binding.contentTextView.selectStartMoveIndex(relativePage, lineIndex, charIndex)
+    fun selectStartMoveIndex(relativePagePos: Int, lineIndex: Int, charIndex: Int) {
+        binding.contentTextView.selectStartMoveIndex(relativePagePos, lineIndex, charIndex)
     }
 
     fun selectEndMove(x: Float, y: Float) {
         binding.contentTextView.selectEndMove(x, y - headerHeight)
     }
 
-    fun selectEndMoveIndex(relativePage: Int, lineIndex: Int, charIndex: Int) {
-        binding.contentTextView.selectEndMoveIndex(relativePage, lineIndex, charIndex)
+    fun selectEndMoveIndex(relativePagePos: Int, lineIndex: Int, charIndex: Int) {
+        binding.contentTextView.selectEndMoveIndex(relativePagePos, lineIndex, charIndex)
     }
 
     fun cancelSelect() {
@@ -291,11 +302,11 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.createBookmark()
     }
 
-    fun relativePage(relativePos: Int): TextPage {
-        return binding.contentTextView.relativePage(relativePos)
+    fun relativePage(relativePagePos: Int): TextPage {
+        return binding.contentTextView.relativePage(relativePagePos)
     }
 
-    val selectedText: String get() = binding.contentTextView.selectedText
+    val selectedText: String get() = binding.contentTextView.getSelectedText()
 
     val textPage get() = binding.contentTextView.textPage
 }

@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.util.Base64
 import androidx.annotation.Keep
 import com.bumptech.glide.load.model.GlideUrl
-import com.bumptech.glide.load.model.LazyHeaders
+import com.script.SimpleBindings
 import io.legado.app.constant.AppConst.SCRIPT_ENGINE
 import io.legado.app.constant.AppConst.UA_NAME
 import io.legado.app.constant.AppPattern.JS_PATTERN
@@ -16,6 +16,7 @@ import io.legado.app.exception.ConcurrentException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.JsExtensions
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.glide.GlideHeaders
 import io.legado.app.help.http.*
 import io.legado.app.utils.*
 import kotlinx.coroutines.runBlocking
@@ -24,7 +25,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.net.URLEncoder
 import java.util.regex.Pattern
-import javax.script.SimpleBindings
 
 /**
  * Created by GKF on 2018/1/24.
@@ -69,18 +69,21 @@ class AnalyzeUrl(
     private var retry: Int = 0
     private var useWebView: Boolean = false
     private var webJs: String? = null
+    private val enabledCookieJar = source?.enabledCookieJar ?: false
 
     init {
-        val urlMatcher = paramPattern.matcher(baseUrl)
-        if (urlMatcher.find()) baseUrl = baseUrl.substring(0, urlMatcher.start())
-        headerMapF?.let {
-            headerMap.putAll(it)
-            if (it.containsKey("proxy")) {
-                proxy = it["proxy"]
-                headerMap.remove("proxy")
+        if (!mUrl.isDataUrl()) {
+            val urlMatcher = paramPattern.matcher(baseUrl)
+            if (urlMatcher.find()) baseUrl = baseUrl.substring(0, urlMatcher.start())
+            (headerMapF ?: source?.getHeaderMap(true))?.let {
+                headerMap.putAll(it)
+                if (it.containsKey("proxy")) {
+                    proxy = it["proxy"]
+                    headerMap.remove("proxy")
+                }
             }
+            initUrl()
         }
-        initUrl()
     }
 
     /**
@@ -189,9 +192,6 @@ class AnalyzeUrl(
                         }
                     }
                 }
-        }
-        headerMap[UA_NAME] ?: let {
-            headerMap[UA_NAME] = AppConfig.userAgent
         }
         urlNoQuery = url
         when (method) {
@@ -457,10 +457,10 @@ class AnalyzeUrl(
      * 访问网站,返回ByteArray
      */
     suspend fun getByteArrayAwait(): ByteArray {
+        val concurrentRecord = fetchStart()
+
         @Suppress("RegExpRedundantEscape")
         val dataUriFindResult = dataUriRegex.find(urlNoQuery)
-        val concurrentRecord = fetchStart()
-        setCookie(source?.getKey())
         @Suppress("BlockingMethodInNonBlockingContext")
         if (dataUriFindResult != null) {
             val dataUriBase64 = dataUriFindResult.groupValues[1]
@@ -468,6 +468,7 @@ class AnalyzeUrl(
             fetchEnd(concurrentRecord)
             return byteArray
         } else {
+            setCookie(source?.getKey())
             val byteArray = getProxyClient(proxy).newCallResponseBody(retry) {
                 addHeaders(headerMap)
                 when (method) {
@@ -518,31 +519,42 @@ class AnalyzeUrl(
         }
     }
 
+    /**
+     *设置cookie 优先级
+     * urlOption临时cookie > 数据库cookie = okhttp CookieJar保存在内存中的cookie
+     *@param tag 书源url 缺省为传入的url
+     */
     private fun setCookie(tag: String?) {
-        if (tag != null) {
-            val cookie = CookieStore.getCookie(tag)
-            if (cookie.isNotEmpty()) {
-                val cookieMap = CookieStore.cookieToMap(cookie)
-                val customCookieMap = CookieStore.cookieToMap(headerMap["Cookie"] ?: "")
-                cookieMap.putAll(customCookieMap)
-                val newCookie = CookieStore.mapToCookie(cookieMap)
-                newCookie?.let {
-                    headerMap.put("Cookie", it)
-                }
+        val domain = NetworkUtils.getSubDomain(tag ?: url)
+        //书源启用保存cookie时 添加内存中的cookie到数据库
+        if (enabledCookieJar) {
+            val key = "${domain}_cookieJar"
+            CacheManager.getFromMemory(key)?.let {
+                CookieStore.replaceCookie(domain, it)
+                CacheManager.deleteMemory(key)
+            }
+        }
+        val cookie = CookieStore.getCookie(domain)
+        if (cookie.isNotEmpty()) {
+            val cookieMap = CookieStore.cookieToMap(cookie)
+            val customCookieMap = CookieStore.cookieToMap(headerMap["Cookie"] ?: "")
+            cookieMap.putAll(customCookieMap)
+            CookieStore.mapToCookie(cookieMap)?.let {
+                headerMap.put("Cookie", it)
             }
         }
     }
 
+    /**
+     *获取处理过阅读定义的urlOption和cookie的GlideUrl
+     */
     fun getGlideUrl(): GlideUrl {
-        val headers = LazyHeaders.Builder()
-        headerMap.forEach { (key, value) ->
-            headers.addHeader(key, value)
-        }
-        return GlideUrl(url, headers.build())
+        setCookie(source?.getKey())
+        return GlideUrl(url, GlideHeaders(headerMap))
     }
 
     fun getUserAgent(): String {
-        return headerMap[UA_NAME] ?: AppConfig.userAgent
+        return headerMap.get(UA_NAME, true) ?: AppConfig.userAgent
     }
 
     fun isPost(): Boolean {

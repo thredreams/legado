@@ -10,6 +10,7 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.charsets
+import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
@@ -92,6 +93,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         menu.findItem(R.id.menu_enable_replace)?.isChecked = AppConfig.exportUseReplace
         menu.findItem(R.id.menu_export_no_chapter_name)?.isChecked = AppConfig.exportNoChapterName
         menu.findItem(R.id.menu_export_web_dav)?.isChecked = AppConfig.exportToWebDav
+        menu.findItem(R.id.menu_export_pics_file)?.isChecked = AppConfig.exportPictureFile
         menu.findItem(R.id.menu_export_type)?.title =
             "${getString(R.string.export_type)}(${getTypeName()})"
         menu.findItem(R.id.menu_export_charset)?.title =
@@ -128,6 +130,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
             R.id.menu_enable_replace -> AppConfig.exportUseReplace = !item.isChecked
             R.id.menu_export_no_chapter_name -> AppConfig.exportNoChapterName = !item.isChecked
             R.id.menu_export_web_dav -> AppConfig.exportToWebDav = !item.isChecked
+            R.id.menu_export_pics_file -> AppConfig.exportPictureFile = !item.isChecked
             R.id.menu_export_folder -> {
                 selectExportFolder(-1)
             }
@@ -160,7 +163,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
                 else -> appDb.bookDao.flowByGroup(groupId)
             }.conflate().map { books ->
                 val booksDownload = books.filter {
-                    it.type == 0
+                    it.type == BookType.default || it.type == BookType.image
                 }
                 when (getPrefInt(PreferKey.bookshelfSort)) {
                     1 -> booksDownload.sortedByDescending { it.latestChapterTime }

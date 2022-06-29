@@ -14,13 +14,11 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.databinding.ActivityRssArtivlesBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
-import io.legado.app.utils.StartActivityContract
-import io.legado.app.utils.gone
-import io.legado.app.utils.startActivity
+import io.legado.app.utils.*
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import io.legado.app.utils.visible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,9 +43,10 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.viewPager.adapter = adapter
         binding.tabLayout.setupWithViewPager(binding.viewPager)
-        viewModel.titleLiveData.observe(this, {
+        binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
+        viewModel.titleLiveData.observe(this) {
             binding.titleBar.title = it
-        })
+        }
         viewModel.initData(intent) {
             upFragments()
         }
@@ -104,9 +103,14 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
 
     private fun setSourceVariable() {
         launch {
-            val variable = withContext(Dispatchers.IO) { viewModel.rssSource?.getVariable() }
+            val source = viewModel.rssSource
+            if (source == null) {
+                toastOnUi("源不存在")
+                return@launch
+            }
+            val variable = withContext(Dispatchers.IO) { source.getVariable() }
             alert(R.string.set_source_variable) {
-                setMessage("源变量可在js中通过source.getVariable()获取")
+                setMessage(source.getDisplayVariableComment("源变量可在js中通过source.getVariable()获取"))
                 val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
                     editView.hint = "source variable"
                     editView.setText(variable)

@@ -33,6 +33,7 @@ import splitties.systemservices.clipboardManager
 import splitties.systemservices.connectivityManager
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.system.exitProcess
 
 inline fun <reified A : Activity> Context.startActivity(configIntent: Intent.() -> Unit = {}) {
     val intent = Intent(this, A::class.java)
@@ -162,12 +163,13 @@ fun Context.restart() {
     intent?.let {
         intent.addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK
-                or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    or Intent.FLAG_ACTIVITY_CLEAR_TOP
         )
         startActivity(intent)
         //杀掉以前进程
         Process.killProcess(Process.myPid())
+        exitProcess(0)
     }
 }
 
@@ -327,7 +329,9 @@ fun Context.openFileUri(uri: Uri, type: String? = null) {
     }
 }
 
+@Suppress("DEPRECATION")
 val Context.isWifiConnect: Boolean
+    @SuppressLint("MissingPermission")
     get() {
         val info = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
         return info?.isConnected == true
@@ -335,7 +339,7 @@ val Context.isWifiConnect: Boolean
 
 val Context.isPad: Boolean
     get() {
-        return resources.configuration.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK >= Configuration.SCREENLAYOUT_SIZE_LARGE
+        return (resources.configuration.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_LARGE
     }
 
 val Context.channel: String

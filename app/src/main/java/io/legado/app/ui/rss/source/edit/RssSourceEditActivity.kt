@@ -48,7 +48,7 @@ class RssSourceEditActivity :
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it?.let {
             viewModel.importSource(it) { source: RssSource ->
-                upRecyclerView(source)
+                upSourceView(source)
             }
         }
     }
@@ -57,7 +57,7 @@ class RssSourceEditActivity :
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
-            upRecyclerView()
+            upSourceView()
         }
     }
 
@@ -130,10 +130,11 @@ class RssSourceEditActivity :
                     }
                 }
             }
+            R.id.menu_clear_cookie -> viewModel.clearCookie(getRssSource().sourceUrl)
             R.id.menu_auto_complete -> viewModel.autoComplete = !viewModel.autoComplete
             R.id.menu_copy_source -> sendToClip(GSON.toJson(getRssSource()))
             R.id.menu_qr_code_camera -> qrCodeResult.launch()
-            R.id.menu_paste_source -> viewModel.pasteSource { upRecyclerView(it) }
+            R.id.menu_paste_source -> viewModel.pasteSource { upSourceView(it) }
             R.id.menu_share_str -> share(GSON.toJson(getRssSource()))
             R.id.menu_share_qr -> shareWithQr(
                 GSON.toJson(getRssSource()),
@@ -150,10 +151,11 @@ class RssSourceEditActivity :
         binding.recyclerView.adapter = adapter
     }
 
-    private fun upRecyclerView(source: RssSource? = viewModel.rssSource) {
+    private fun upSourceView(source: RssSource? = viewModel.rssSource) {
         source?.let {
             binding.cbIsEnable.isChecked = source.enabled
             binding.cbSingleUrl.isChecked = source.singleUrl
+            binding.cbIsEnableCookie.isChecked = source.enabledCookieJar == true
             binding.cbEnableJs.isChecked = source.enableJs
             binding.cbEnableBaseUrl.isChecked = source.loadWithBaseUrl
         }
@@ -168,11 +170,8 @@ class RssSourceEditActivity :
             add(EditEntity("loginUi", source?.loginUi, R.string.login_ui))
             add(EditEntity("loginCheckJs", source?.loginCheckJs, R.string.login_check_js))
             add(EditEntity("header", source?.header, R.string.source_http_header))
-            add(
-                EditEntity(
-                    "concurrentRate", source?.concurrentRate, R.string.source_concurrent_rate
-                )
-            )
+            add(EditEntity("variableComment", source?.variableComment, R.string.variable_comment))
+            add(EditEntity("concurrentRate", source?.concurrentRate, R.string.concurrent_rate))
             add(EditEntity("sortUrl", source?.sortUrl, R.string.sort_url))
             add(EditEntity("ruleArticles", source?.ruleArticles, R.string.r_articles))
             add(EditEntity("ruleNextPage", source?.ruleNextPage, R.string.r_next))
@@ -191,6 +190,7 @@ class RssSourceEditActivity :
         val source = viewModel.rssSource
         source.enabled = binding.cbIsEnable.isChecked
         source.singleUrl = binding.cbSingleUrl.isChecked
+        source.enabledCookieJar = binding.cbIsEnableCookie.isChecked
         source.enableJs = binding.cbEnableJs.isChecked
         source.loadWithBaseUrl = binding.cbEnableBaseUrl.isChecked
         sourceEntities.forEach {
@@ -204,6 +204,7 @@ class RssSourceEditActivity :
                 "loginUi" -> source.loginUi = it.value
                 "loginCheckJs" -> source.loginCheckJs = it.value
                 "header" -> source.header = it.value
+                "variableComment" -> source.variableComment = it.value
                 "concurrentRate" -> source.concurrentRate = it.value
                 "sortUrl" -> source.sortUrl = it.value
                 "ruleArticles" -> source.ruleArticles = it.value

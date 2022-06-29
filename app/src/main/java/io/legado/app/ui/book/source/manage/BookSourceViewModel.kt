@@ -9,25 +9,31 @@ import io.legado.app.utils.*
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * 书源管理数据修改
+ * 修改数据要copy,直接修改会导致界面不刷新
+ */
 class BookSourceViewModel(application: Application) : BaseViewModel(application) {
 
     fun topSource(vararg sources: BookSource) {
         execute {
+            sources.sortBy { it.customOrder }
             val minOrder = appDb.bookSourceDao.minOrder - 1
-            sources.forEachIndexed { index, bookSource ->
-                bookSource.customOrder = minOrder - index
+            val array = Array(sources.size) {
+                sources[it].copy(customOrder = minOrder - it)
             }
-            appDb.bookSourceDao.update(*sources)
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun bottomSource(vararg sources: BookSource) {
         execute {
+            sources.sortBy { it.customOrder }
             val maxOrder = appDb.bookSourceDao.maxOrder + 1
-            sources.forEachIndexed { index, bookSource ->
-                bookSource.customOrder = maxOrder + index
+            val array = Array(sources.size) {
+                sources[it].copy(customOrder = maxOrder + it)
             }
-            appDb.bookSourceDao.update(*sources)
+            appDb.bookSourceDao.update(*array)
         }
     }
 
@@ -51,59 +57,55 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
 
     fun enableSelection(sources: List<BookSource>) {
         execute {
-            val list = arrayListOf<BookSource>()
-            sources.forEach {
-                list.add(it.copy(enabled = true))
+            val array = Array(sources.size) {
+                sources[it].copy(enabled = true)
             }
-            appDb.bookSourceDao.update(*list.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun disableSelection(sources: List<BookSource>) {
         execute {
-            val list = arrayListOf<BookSource>()
-            sources.forEach {
-                list.add(it.copy(enabled = false))
+            val array = Array(sources.size) {
+                sources[it].copy(enabled = false)
             }
-            appDb.bookSourceDao.update(*list.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun enableSelectExplore(sources: List<BookSource>) {
         execute {
-            val list = arrayListOf<BookSource>()
-            sources.forEach {
-                list.add(it.copy(enabledExplore = true))
+            val array = Array(sources.size) {
+                sources[it].copy(enabledExplore = true)
             }
-            appDb.bookSourceDao.update(*list.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun disableSelectExplore(sources: List<BookSource>) {
         execute {
-            val list = arrayListOf<BookSource>()
-            sources.forEach {
-                list.add(it.copy(enabledExplore = false))
+            val array = Array(sources.size) {
+                sources[it].copy(enabledExplore = false)
             }
-            appDb.bookSourceDao.update(*list.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun selectionAddToGroups(sources: List<BookSource>, groups: String) {
         execute {
-            sources.forEach { source ->
-                source.addGroup(groups)
+            val array = Array(sources.size) {
+                sources[it].copy().addGroup(groups)
             }
-            appDb.bookSourceDao.update(*sources.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 
     fun selectionRemoveFromGroups(sources: List<BookSource>, groups: String) {
         execute {
-            sources.forEach { source ->
-                source.removeGroup(groups)
+            val array = Array(sources.size) {
+                sources[it].copy().removeGroup(groups)
             }
-            appDb.bookSourceDao.update(*sources.toTypedArray())
+            appDb.bookSourceDao.update(*array)
         }
     }
 

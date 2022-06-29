@@ -3,11 +3,11 @@ package io.legado.app.help.storage
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
-import io.legado.app.help.DefaultData
+import io.legado.app.help.AppWebDav
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -38,8 +38,9 @@ object Backup {
             "readRecord.json",
             "searchHistory.json",
             "sourceSub.json",
-            DefaultData.txtTocRuleFileName,
-            DefaultData.httpTtsFileName,
+            "txtTocRule.json",
+            "httpTTS.json",
+            "keyboardAssists.json",
             ReadBookConfig.configFileName,
             ReadBookConfig.shareConfigFileName,
             ThemeConfig.configFileName,
@@ -48,23 +49,22 @@ object Backup {
     }
 
     fun autoBack(context: Context) {
-        val lastBackup = context.getPrefLong(PreferKey.lastBackup)
+        val lastBackup = LocalConfig.lastBackup
         if (lastBackup + TimeUnit.DAYS.toMillis(1) < System.currentTimeMillis()) {
             Coroutine.async {
                 if (!AppWebDav.hasBackUp()) {
                     backup(context, context.getPrefString(PreferKey.backupPath), true)
                 } else {
-                    context.putPrefLong(PreferKey.lastBackup, System.currentTimeMillis())
+                    LocalConfig.lastBackup = System.currentTimeMillis()
                 }
             }.onError {
-                AppLog.put("备份出错\n${it.localizedMessage}", it)
-                appCtx.toastOnUi(appCtx.getString(R.string.autobackup_fail, it.localizedMessage))
+                AppLog.put("自动备份失败\n${it.localizedMessage}")
             }
         }
     }
 
     suspend fun backup(context: Context, path: String?, isAuto: Boolean = false) {
-        context.putPrefLong(PreferKey.lastBackup, System.currentTimeMillis())
+        LocalConfig.lastBackup = System.currentTimeMillis()
         withContext(IO) {
             FileUtils.delete(backupPath)
             writeListToJson(appDb.bookDao.all, "bookshelf.json", backupPath)
@@ -77,8 +77,9 @@ object Backup {
             writeListToJson(appDb.readRecordDao.all, "readRecord.json", backupPath)
             writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
             writeListToJson(appDb.ruleSubDao.all, "sourceSub.json", backupPath)
-            writeListToJson(appDb.txtTocRuleDao.all, DefaultData.txtTocRuleFileName, backupPath)
-            writeListToJson(appDb.httpTTSDao.all, DefaultData.httpTtsFileName, backupPath)
+            writeListToJson(appDb.txtTocRuleDao.all, "txtTocRule.json", backupPath)
+            writeListToJson(appDb.httpTTSDao.all, "httpTTS.json", backupPath)
+            writeListToJson(appDb.keyboardAssistsDao.all, "keyboardAssists.json", backupPath)
             GSON.toJson(ReadBookConfig.configList).let {
                 FileUtils.createFileIfNotExist(backupPath + File.separator + ReadBookConfig.configFileName)
                     .writeText(it)
@@ -106,7 +107,6 @@ object Backup {
                 }
                 edit.commit()
             }
-            AppWebDav.backUpWebDav(backupPath)
             when {
                 path.isNullOrBlank() -> {
                     copyBackup(context.getExternalFilesDir(null)!!, false)
@@ -118,6 +118,7 @@ object Backup {
                     copyBackup(File(path), isAuto)
                 }
             }
+            AppWebDav.backUpWebDav(backupPath)
         }
     }
 

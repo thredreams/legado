@@ -101,7 +101,7 @@ object ChapterProvider {
     /**
      * 获取拆分完的章节数据
      */
-    fun getTextChapter(
+    suspend fun getTextChapter(
         book: Book,
         bookChapter: BookChapter,
         displayTitle: String,
@@ -116,7 +116,7 @@ object ChapterProvider {
         if (ReadBookConfig.titleMode != 2) {
             displayTitle.splitNotBlank("\n").forEach { text ->
                 setTypeText(
-                    absStartX, durY, text, textPages, stringBuilder, titlePaint,
+                    book, absStartX, durY, text, textPages, stringBuilder, titlePaint,
                     isTitle = true,
                     isTitleWithNoContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume
@@ -128,7 +128,7 @@ object ChapterProvider {
             durY += titleBottomSpacing
         }
         contents.forEach { content ->
-            if (book.getImageStyle() == Book.imgStyleText) {
+            if (book.getImageStyle().equals(Book.imgStyleText, true)) {
                 var text = content.replace(srcReplaceChar, "▣")
                 val srcList = LinkedList<String>()
                 val sb = StringBuffer()
@@ -136,14 +136,13 @@ object ChapterProvider {
                 while (matcher.find()) {
                     matcher.group(1)?.let { src ->
                         srcList.add(src)
-                        ImageProvider.getImage(book, bookChapter.index, src, ReadBook.bookSource)
                         matcher.appendReplacement(sb, srcReplaceChar)
                     }
                 }
                 matcher.appendTail(sb)
                 text = sb.toString()
                 setTypeText(
-                    absStartX, durY, text, textPages, stringBuilder, contentPaint,
+                    book, absStartX, durY, text, textPages, stringBuilder, contentPaint,
                     srcList = srcList
                 ).let {
                     absStartX = it.first
@@ -156,14 +155,14 @@ object ChapterProvider {
                     val text = content.substring(start, matcher.start())
                     if (text.isNotBlank()) {
                         setTypeText(
-                            absStartX, durY, text, textPages, stringBuilder, contentPaint
+                            book, absStartX, durY, text, textPages, stringBuilder, contentPaint
                         ).let {
                             absStartX = it.first
                             durY = it.second
                         }
                     }
                     durY = setTypeImage(
-                        book, bookChapter, matcher.group(1)!!,
+                        book, matcher.group(1)!!,
                         absStartX, durY, textPages, book.getImageStyle()
                     )
                     start = matcher.end()
@@ -172,7 +171,7 @@ object ChapterProvider {
                     val text = content.substring(start, content.length)
                     if (text.isNotBlank()) {
                         setTypeText(
-                            absStartX, durY, text, textPages, stringBuilder, contentPaint
+                            book, absStartX, durY, text, textPages, stringBuilder, contentPaint
                         ).let {
                             absStartX = it.first
                             durY = it.second
@@ -200,9 +199,11 @@ object ChapterProvider {
         )
     }
 
-    private fun setTypeImage(
+    /**
+     * 排版图片
+     */
+    private suspend fun setTypeImage(
         book: Book,
-        chapter: BookChapter,
         src: String,
         x: Int,
         y: Float,
@@ -210,22 +211,23 @@ object ChapterProvider {
         imageStyle: String?,
     ): Float {
         var durY = y
-        ImageProvider.getImage(book, chapter.index, src, ReadBook.bookSource)?.let {
+        val size = ImageProvider.getImageSize(book, src, ReadBook.bookSource)
+        if (size.width > 0 && size.height > 0) {
             if (durY > visibleHeight) {
                 textPages.last().height = durY
                 textPages.add(TextPage())
                 durY = 0f
             }
-            var height = it.height
-            var width = it.width
+            var height = size.height
+            var width = size.width
             when (imageStyle?.toUpperCase(Locale.ROOT)) {
                 Book.imgStyleFull -> {
                     width = visibleWidth
-                    height = it.height * visibleWidth / it.width
+                    height = size.height * visibleWidth / size.width
                 }
                 else -> {
-                    if (it.width > visibleWidth) {
-                        height = it.height * visibleWidth / it.width
+                    if (size.width > visibleWidth) {
+                        height = size.height * visibleWidth / size.width
                         width = visibleWidth
                     }
                     if (height > visibleHeight) {
@@ -250,12 +252,7 @@ object ChapterProvider {
                 Pair(0f, width.toFloat())
             }
             textLine.textChars.add(
-                TextChar(
-                    charData = src,
-                    start = x + start,
-                    end = x + end,
-                    isImage = true
-                )
+                TextChar(charData = src, start = x + start, end = x + end, isImage = true)
             )
             textPages.last().textLines.add(textLine)
         }
@@ -265,7 +262,8 @@ object ChapterProvider {
     /**
      * 排版文字
      */
-    private fun setTypeText(
+    private suspend fun setTypeText(
+        book: Book,
         x: Int,
         y: Float,
         text: String,
@@ -332,54 +330,46 @@ object ChapterProvider {
             val words =
                 text.substring(layout.getLineStart(lineIndex), layout.getLineEnd(lineIndex))
             val desiredWidth = layout.getLineWidth(lineIndex)
-            var isLastLine = false
             when {
                 lineIndex == 0 && layout.lineCount > 1 && !isTitle -> {
                     //第一行 非标题
                     textLine.text = words
                     addCharsToLineFirst(
-                        absStartX,
-                        textLine,
-                        words.toStringArray(),
-                        textPaint,
-                        desiredWidth,
-                        srcList
+                        book, absStartX, textLine, words.toStringArray(),
+                        textPaint, desiredWidth, srcList
                     )
                 }
                 lineIndex == layout.lineCount - 1 -> {
                     //最后一行
-                    textLine.text = "$words\n"
-                    isLastLine = true
+                    textLine.text = words
+                    textLine.isParagraphEnd = true
                     //标题x轴居中
-                    val startX =
-                        if (isTitle && ReadBookConfig.titleMode == 1 || isTitleWithNoContent || isVolumeTitle)
-                            (visibleWidth - layout.getLineWidth(lineIndex)) / 2
-                        else 0f
+                    val startX = if (isTitle && ReadBookConfig.titleMode == 1
+                        || isTitleWithNoContent
+                        || isVolumeTitle
+                    ) {
+                        (visibleWidth - layout.getLineWidth(lineIndex)) / 2
+                    } else {
+                        0f
+                    }
                     addCharsToLineLast(
-                        absStartX,
-                        textLine,
-                        words.toStringArray(),
-                        textPaint,
-                        startX,
-                        srcList
+                        book, absStartX, textLine, words.toStringArray(),
+                        textPaint, startX, srcList
                     )
                 }
                 else -> {
                     //中间行
                     textLine.text = words
                     addCharsToLineMiddle(
-                        absStartX,
-                        textLine,
-                        words.toStringArray(),
-                        textPaint,
-                        desiredWidth,
-                        0f,
-                        srcList
+                        book, absStartX, textLine, words.toStringArray(),
+                        textPaint, desiredWidth, 0f, srcList
                     )
                 }
             }
             stringBuilder.append(words)
-            if (isLastLine) stringBuilder.append("\n")
+            if (textLine.isParagraphEnd) {
+                stringBuilder.append("\n")
+            }
             textPages.last().textLines.add(textLine)
             textLine.upTopBottom(durY, textPaint)
             durY += textPaint.textHeight * lineSpacingExtra
@@ -392,7 +382,8 @@ object ChapterProvider {
     /**
      * 有缩进,两端对齐
      */
-    private fun addCharsToLineFirst(
+    private suspend fun addCharsToLineFirst(
+        book: Book,
         absStartX: Int,
         textLine: TextLine,
         words: Array<String>,
@@ -402,7 +393,7 @@ object ChapterProvider {
     ) {
         var x = 0f
         if (!ReadBookConfig.textFullJustify) {
-            addCharsToLineLast(absStartX, textLine, words, textPaint, x, srcList)
+            addCharsToLineLast(book, absStartX, textLine, words, textPaint, x, srcList)
             return
         }
         val bodyIndent = ReadBookConfig.paragraphIndent
@@ -410,24 +401,23 @@ object ChapterProvider {
         bodyIndent.toStringArray().forEach { char ->
             val x1 = x + icw
             textLine.textChars.add(
-                TextChar(
-                    charData = char,
-                    start = absStartX + x,
-                    end = absStartX + x1
-                )
+                TextChar(charData = char, start = absStartX + x, end = absStartX + x1)
             )
             x = x1
         }
         if (words.size > bodyIndent.length) {
             val words1 = words.copyOfRange(bodyIndent.length, words.size)
-            addCharsToLineMiddle(absStartX, textLine, words1, textPaint, desiredWidth, x, srcList)
+            addCharsToLineMiddle(
+                book, absStartX, textLine, words1, textPaint, desiredWidth, x, srcList
+            )
         }
     }
 
     /**
      * 无缩进,两端对齐
      */
-    private fun addCharsToLineMiddle(
+    private suspend fun addCharsToLineMiddle(
+        book: Book,
         absStartX: Int,
         textLine: TextLine,
         words: Array<String>,
@@ -437,7 +427,7 @@ object ChapterProvider {
         srcList: LinkedList<String>?
     ) {
         if (!ReadBookConfig.textFullJustify) {
-            addCharsToLineLast(absStartX, textLine, words, textPaint, startX, srcList)
+            addCharsToLineLast(book, absStartX, textLine, words, textPaint, startX, srcList)
             return
         }
         val gapCount: Int = words.lastIndex
@@ -446,24 +436,7 @@ object ChapterProvider {
         words.forEachIndexed { index, char ->
             val cw = StaticLayout.getDesiredWidth(char, textPaint)
             val x1 = if (index != words.lastIndex) (x + cw + d) else (x + cw)
-            if (srcList != null && char == srcReplaceChar) {
-                textLine.textChars.add(
-                    TextChar(
-                        charData = srcList.removeFirst(),
-                        start = absStartX + x,
-                        end = absStartX + x1,
-                        isImage = true
-                    )
-                )
-            } else {
-                textLine.textChars.add(
-                    TextChar(
-                        charData = char,
-                        start = absStartX + x,
-                        end = absStartX + x1
-                    )
-                )
-            }
+            addCharToLine(book, absStartX, textLine, char, x, x1, srcList)
             x = x1
         }
         exceed(absStartX, textLine, words)
@@ -472,7 +445,8 @@ object ChapterProvider {
     /**
      * 最后一行,自然排列
      */
-    private fun addCharsToLineLast(
+    private suspend fun addCharsToLineLast(
+        book: Book,
         absStartX: Int,
         textLine: TextLine,
         words: Array<String>,
@@ -484,27 +458,44 @@ object ChapterProvider {
         words.forEach { char ->
             val cw = StaticLayout.getDesiredWidth(char, textPaint)
             val x1 = x + cw
-            if (srcList != null && char == srcReplaceChar) {
-                textLine.textChars.add(
-                    TextChar(
-                        charData = srcList.removeFirst(),
-                        start = absStartX + x,
-                        end = absStartX + x1,
-                        isImage = true
-                    )
-                )
-            } else {
-                textLine.textChars.add(
-                    TextChar(
-                        charData = char,
-                        start = absStartX + x,
-                        end = absStartX + x1
-                    )
-                )
-            }
+            addCharToLine(book, absStartX, textLine, char, x, x1, srcList)
             x = x1
         }
         exceed(absStartX, textLine, words)
+    }
+
+    /**
+     * 添加字符
+     */
+    private suspend fun addCharToLine(
+        book: Book,
+        absStartX: Int,
+        textLine: TextLine,
+        char: String,
+        xStart: Float,
+        xEnd: Float,
+        srcList: LinkedList<String>?
+    ) {
+        if (srcList != null && char == srcReplaceChar) {
+            val src = srcList.removeFirst()
+            ImageProvider.cacheImage(book, src, ReadBook.bookSource)
+            textLine.textChars.add(
+                TextChar(
+                    charData = src,
+                    start = absStartX + xStart,
+                    end = absStartX + xEnd,
+                    isImage = true
+                )
+            )
+        } else {
+            textLine.textChars.add(
+                TextChar(
+                    charData = char,
+                    start = absStartX + xStart,
+                    end = absStartX + xEnd
+                )
+            )
+        }
     }
 
     /**
@@ -622,8 +613,8 @@ object ChapterProvider {
      */
     fun upLayout() {
         doublePage = (viewWidth > viewHeight || appCtx.isPad)
-            && ReadBook.pageAnim() != 3
-            && AppConfig.doublePageHorizontal
+                && ReadBook.pageAnim() != 3
+                && AppConfig.doublePageHorizontal
         if (viewWidth > 0 && viewHeight > 0) {
             paddingLeft = ReadBookConfig.paddingLeft.dpToPx()
             paddingTop = ReadBookConfig.paddingTop.dpToPx()

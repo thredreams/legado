@@ -7,6 +7,12 @@ assignees: ''
 ---
 
 
+### 浏览器版本（web端反馈，先勾选浏览器，然后填版本号）
+* [ ] Chrome/Edge/Firefox PC
+* [ ] Chrome/Edge/Firefox/WebView Android
+* [ ] 其他浏览器，请补充
+>
+
 ### 机型（如Redmi K30 Pro）
 >
 
@@ -18,6 +24,7 @@ assignees: ''
 ### 阅读Legdao版本（我的-关于-版本,如3.20.112220）
 >
 
+
 ### 网络环境（移动，联通，电信，移动宽带，联通宽带，电信宽带，等等..）
 >
 
@@ -26,27 +33,27 @@ assignees: ''
 >
 
 
-### 使用书源（填写URL或者JSON）
+### 相关截图
 >
 
-
-```json
-
-
-
-
-
-
-```
 
 ### 复现步骤（详细描述导致问题产生的操作步骤，如果能稳定复现）
 >
 
 
+### 使用书源（填写URL或者JSON）
+<details>
+ <summary>点击展开</summary>
+ <pre><code>
 
 
-### 日志提交（问题截图或者日志）
->
+<pre></code>
+</details>
+<h3>日志提交（我的-关于-崩溃日志，书架-右上角-日志）</h3>
+<details>
+ <summary>点击展开</summary>
+ <pre><code>
 
 
-
+<pre></code>
+</details>

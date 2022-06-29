@@ -5,13 +5,19 @@ package io.legado.app.help.http
 import android.text.TextUtils
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Cookie
+import io.legado.app.help.CacheManager
 import io.legado.app.help.http.api.CookieManager
 import io.legado.app.utils.NetworkUtils
 
 object CookieStore : CookieManager {
 
+    /**
+     *保存cookie到数据库，会自动识别url的二级域名
+     */
     override fun setCookie(url: String, cookie: String?) {
-        val cookieBean = Cookie(NetworkUtils.getSubDomain(url), cookie ?: "")
+        val domain = NetworkUtils.getSubDomain(url)
+        CacheManager.putMemory("${domain}_cookie", cookie ?: "")
+        val cookieBean = Cookie(domain, cookie ?: "")
         appDb.cookieDao.insert(cookieBean)
     }
 
@@ -30,11 +36,18 @@ object CookieStore : CookieManager {
         }
     }
 
+    /**
+     *获取url所属的二级域名的cookie
+     */
     override fun getCookie(url: String): String {
-        val cookieBean = appDb.cookieDao.get(NetworkUtils.getSubDomain(url))
-        return cookieBean?.cookie ?: ""
+        val domain = NetworkUtils.getSubDomain(url)
+        CacheManager.getFromMemory("${domain}_cookie")?.let { return it }
+        val cookieBean = appDb.cookieDao.get(domain)
+        val cookie = cookieBean?.cookie ?: ""
+        CacheManager.putMemory(url, cookie)
+        return cookie
     }
-    
+
     fun getKey(url: String, key: String): String {
         val cookie = getCookie(url)
         val cookieMap = cookieToMap(cookie)
@@ -42,7 +55,10 @@ object CookieStore : CookieManager {
     }
 
     override fun removeCookie(url: String) {
-        appDb.cookieDao.delete(NetworkUtils.getSubDomain(url))
+        val domain = NetworkUtils.getSubDomain(url)
+        appDb.cookieDao.delete(domain)
+        CacheManager.deleteMemory("${domain}_cookie")
+        android.webkit.CookieManager.getInstance().removeAllCookies(null)
     }
 
     override fun cookieToMap(cookie: String): MutableMap<String, String> {

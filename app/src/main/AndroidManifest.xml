@@ -7,10 +7,6 @@
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -151,6 +147,7 @@
         <!-- 主界面 -->
         <activity
             android:name=".ui.main.MainActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleTask" />
         <!-- 阅读界面 -->
@@ -249,7 +246,7 @@
             android:screenOrientation="behind" />
         <!-- 书籍管理 -->
         <activity
-            android:name=".ui.book.arrange.ArrangeBookActivity"
+            android:name=".ui.book.manage.BookshelfManageActivity"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 书源调试 -->
@@ -281,6 +278,10 @@
         <activity
             android:name=".ui.book.local.ImportBookActivity"
             android:launchMode="singleTop" />
+        <!-- 添加远程 -->
+        <activity
+            android:name=".ui.book.remote.RemoteBookActivity"
+            android:launchMode="singleTop" />
         <!-- 发现界面 -->
         <activity
             android:name=".ui.book.explore.ExploreShowActivity"
@@ -292,6 +293,10 @@
         <!-- Rss收藏 -->
         <activity
             android:name=".ui.rss.favorites.RssFavoritesActivity"
+            android:launchMode="singleTop" />
+        <!-- 书签 -->
+        <activity
+            android:name=".ui.book.bookmark.AllBookmarkActivity"
             android:launchMode="singleTop" />
         <!-- 缓存界面 -->
         <activity
@@ -354,6 +359,13 @@
                 <data android:scheme="legado" />
                 <data android:scheme="yuedu" />
             </intent-filter>
+        </activity>
+        <!-- 验证码输入 -->
+        <activity
+            android:name=".ui.association.VerificationCodeActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:exported="true"
+            android:theme="@style/AppTheme.Transparent">
         </activity>
         <!-- 打开文件 -->
         <activity
