@@ -17,6 +17,9 @@ import io.legado.app.utils.postEvent
 import io.legado.app.utils.startService
 import splitties.init.appCtx
 
+/**
+ * 音频播放
+ */
 object AudioPlay {
     var titleData = MutableLiveData<String>()
     var coverData = MutableLiveData<String>()

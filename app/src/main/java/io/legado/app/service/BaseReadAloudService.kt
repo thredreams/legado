@@ -120,13 +120,16 @@ abstract class BaseReadAloudService : BaseService(),
             nowSpeak = 0
             readAloudNumber = textChapter.getReadLength(pageIndex)
             contentList.clear()
+            // 是否开启按页朗读
             if (getPrefBoolean(PreferKey.readAloudByPage)) {
+                // 从当前页开始，每页字按行加入列表
                 for (index in pageIndex..textChapter.lastIndex) {
                     textChapter.getPage(index)?.text?.split("\n")?.let {
                         contentList.addAll(it)
                     }
                 }
             } else {
+                // 从当前页开始合并章节剩余页面的字符，然后按行加入列表
                 textChapter.getUnRead(pageIndex).split("\n").forEach {
                     if (it.isNotEmpty()) {
                         contentList.add(it)
@@ -174,7 +177,7 @@ abstract class BaseReadAloudService : BaseService(),
             ReadBook.moveToPrevChapter(true)
         }
     }
-
+    // 延时处理，连续点击的时候不要执行playstop等代码
     private fun nextP() {
         if (nowSpeak < contentList.size - 1) {
             playStop()

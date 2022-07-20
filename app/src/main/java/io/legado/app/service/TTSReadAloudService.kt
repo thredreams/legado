@@ -87,6 +87,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 }
                 for (i in nowSpeak until contentList.size) {
                     val text = contentList[i].replace(AppPattern.notReadAloudRegex, "")
+                    // 从本地TTS获取状态可能有问题
                     result = tts.speak(text, TextToSpeech.QUEUE_ADD, null, AppConst.APP_TAG + i)
                     if (result == TextToSpeech.ERROR) {
                         AppLog.put("tts朗读出错:$text")
